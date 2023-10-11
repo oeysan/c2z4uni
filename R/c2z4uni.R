@@ -399,7 +399,7 @@ SdgInfo <- \(sdg.sum,
 
   for (i in sdgs) {
     sdg.id <- sprintf("sdg%d", i)
-    if (is.null(sdg.path)) sdg.path <- "{{ .Site.BaseURL }}images/sdg"
+    if (is.null(sdg.path)) sdg.path <- "/images/sdg"
     sdg.image <- file.path(sdg.path, sprintf("sdg%02d_%s.png",i, lang))
     sdg.publications <- Dict("publications", lang, sdg.sum[[i]])
     sdg.span <- sprintf("%s", sdg.sum[[i]])
@@ -1280,6 +1280,18 @@ InnUsers <- \(i = 1,
               log = list()) {
 
   UpdateCard <- \(x, y) {
+
+    # Add photo class if missing
+    if (!grepl("class=\"photo\"", x)) {
+      missing.person <- paste0(
+        "vrtx-hinn-person-card\">\n
+        <div class=\"photo\">
+          <i class=\"lar la-user-circle missing-person\"></i>
+        </div>"
+      )
+      x <- gsub("vrtx-hinn-person-card\">", missing.person, x)
+    }
+
     card <- htmltools::div(htmltools::HTML(x), class = "personas")
     cristin.url <- htmltools::a(
       "Cristin",

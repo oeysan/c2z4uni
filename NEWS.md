@@ -1,5 +1,9 @@
 # c2z4uni (development version)
 
+#### Minor 
+
+* Added a missing profile image icon to user cards
+
 #### Bug fixes
 
 * Path to SDG images
