@@ -1,0 +1,14 @@
+Meta
+.Rproj.user
+*.Rhistory
+.Renviron
+.RData
+.Ruserdata
+.Rprofile
+cran-comments.md
+tests
+doc
+!inst/extdata/doc
+revdep/
+docs
+inst/doc

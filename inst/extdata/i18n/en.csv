@@ -1,0 +1,14 @@
+﻿key,singularis,pluralis
+affiliation,Affiliated,
+readmore,Read More,
+abstract,Abstract,
+contributors,Contributors,
+webpage,Webpage,
+publications,Publication,Publications
+archive,Archive,
+email.subject,"Registered publications in cristin (%s, %s)",
+email.header,This document contains registered publications in cristin from %s for %s %s. The archive is located at https://oeysan.github.io/c2z4inn/.,
+c2z,CRIStin Bot is powered by,
+inn.url,https://www.inn.no/english/find-an-employee/,
+sdg,Sustainable Development Goals,
+sdg.publications,Publications on Sustainable Development Goals,

@@ -1,0 +1,14 @@
+﻿key,singularis,pluralis
+affiliation,Affiliert,
+readmore,Les meir,
+abstract,Samandrag,
+contributors,Medverkande,
+webpage,Nettside,
+publications,Publikasjon,Publikasjonar
+archive,Arkiv,
+email.subject,"Registrerte publikasjonar i Cristin (%s, %s)",
+email.header,"Dette dokumentet inneheld registrerte publikasjonar i Cristin ved %s for %s, %s. Arkivet er tilgjengeleg på https://oeysan.github.io/c2z4inn/.",
+c2z,CRIStin Bot nyttar seg av,
+inn.url,https://www.inn.no/finn-en-ansatt/,
+sdg,Berekraftsmål,
+sdg.publications,Publikasjonar om berekraftsmål,
