@@ -1,3 +1,10 @@
+# c2z4uni (development version)
+
+#### Bug fixes
+
+* Path to SDG images
+* Workflow for windows
+
 # c2z4uni 0.1.0.9000
 
 * Initial launch

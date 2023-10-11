@@ -350,7 +350,10 @@ SdgCutoff <- \(sdg, sdg.cutoff = 0.98) {
 #' @title SdgInfo
 #' @keywords internal
 #' @noRd
-SdgInfo <- \(sdg.sum, range = NULL, lang = "no", sdg.path = "images/sdg/") {
+SdgInfo <- \(sdg.sum,
+             range = NULL,
+             lang = "no",
+             sdg.path = NULL) {
 
   # Languages
   # Set language to en if not nb or nn
@@ -396,7 +399,8 @@ SdgInfo <- \(sdg.sum, range = NULL, lang = "no", sdg.path = "images/sdg/") {
 
   for (i in sdgs) {
     sdg.id <- sprintf("sdg%d", i)
-    sdg.image <- file.path(sdg.path,  sprintf("sdg%02d_%s.png",i, lang))
+    if (is.null(sdg.path)) sdg.path <- "{{ .Site.BaseURL }}images/sdg"
+    sdg.image <- file.path(sdg.path, sprintf("sdg%02d_%s.png",i, lang))
     sdg.publications <- Dict("publications", lang, sdg.sum[[i]])
     sdg.span <- sprintf("%s", sdg.sum[[i]])
     sdg.url <- sprintf("%s", sdg.urls[[i]])

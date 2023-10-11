@@ -4,6 +4,7 @@
 #' @param monthlies Data containing monthly information from Cristin.
 #' @param sdg.data Data containing information about Sustainable Development
 #' Goals (SDGs). Default is NULL.
+#' @param sdg.path Path to SDG images. Default is NULL.
 #' @param local.storage Path to local storage directory. Default is NULL.
 #' @param user.cards Logical, indicating whether to update user information
 #' from INN. Default is TRUE.
@@ -49,6 +50,7 @@
 #' @export
 CristinWeb <- function(monthlies,
                        sdg.data = NULL,
+                       sdg.path = NULL,
                        local.storage = NULL,
                        user.cards = TRUE,
                        full.update = FALSE,
@@ -152,7 +154,12 @@ CristinWeb <- function(monthlies,
           class = "sdg-article"
         ),
         htmltools::div(
-          SdgInfo(sdg.data$sum, as.numeric(item$sdg[[1]]), lang = lang) |>
+          SdgInfo(
+            sdg.data$sum,
+            as.numeric(item$sdg[[1]]),
+            lang = lang,
+            sdg.path
+          ) |>
             do.call(what = htmltools::HTML),
           class = "sdg-container"
         )

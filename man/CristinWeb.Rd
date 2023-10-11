@@ -7,6 +7,7 @@
 CristinWeb(
   monthlies,
   sdg.data = NULL,
+  sdg.path = NULL,
   local.storage = NULL,
   user.cards = TRUE,
   full.update = FALSE,
@@ -20,6 +21,8 @@ CristinWeb(
 
 \item{sdg.data}{Data containing information about Sustainable Development
 Goals (SDGs). Default is NULL.}
+
+\item{sdg.path}{Path to SDG images. Default is NULL.}
 
 \item{local.storage}{Path to local storage directory. Default is NULL.}
 

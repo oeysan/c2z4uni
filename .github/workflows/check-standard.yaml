@@ -42,9 +42,10 @@ jobs:
       - name: Install renv
         uses: r-lib/actions/setup-renv@v2
 
-      - name: Install rcmdcheck
-        run: Rscript -e 'install.packages("rcmdcheck")'
-      
+      - name: Install R rcmdcheck
+        run: install.packages("rcmdcheck")        
+        shell: Rscript {0}
+
       - name: Check R package
         uses: r-lib/actions/check-r-package@v2
         with:
