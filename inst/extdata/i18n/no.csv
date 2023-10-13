@@ -7,7 +7,7 @@ webpage,Nettside,
 publications,Publikasjon,Publikasjonar
 archive,Arkiv,
 email.subject,"Registrerte publikasjonar i Cristin (%s, %s)",
-email.header,"Dette dokumentet inneheld registrerte publikasjonar i Cristin ved %s for %s, %s. Arkivet er tilgjengeleg på https://oeysan.github.io/c2z4inn/.",
+email.header,"Dette dokumentet inneheld registrerte publikasjonar i Cristin ved %s for %s, %s. Arkivet er tilgjengeleg på <a href=""https://oeysan.github.io/c2z4inn/no/archive/"">https://oeysan.github.io/c2z4inn/no/archive/</a>.",
 c2z,CRIStin Bot nyttar seg av,
 inn.url,https://www.inn.no/finn-en-ansatt/,
 sdg,Berekraftsmål,
