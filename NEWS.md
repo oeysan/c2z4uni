@@ -2,6 +2,8 @@
 
 #### Minor 
 
+* Some minor adjustment to the internal function `InnCristin`, that now only 
+searches for first and last name. 
 * Added a missing profile image icon to user cards
 
 #### Bug fixes

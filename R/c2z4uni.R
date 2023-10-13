@@ -1154,13 +1154,17 @@ CristinId <- \(id, error = NULL, unit = FALSE) {
 #' @noRd
 InnCristin <- \(name) {
 
+  # Remove any middle names
+  name <- strsplit(name, "\\s+")[[1]] |>
+    (\(x) paste(x[c(1, length(x))], collapse = " "))()
+
   # Query user url
   httr.get <- Online(
     httr::RETRY(
       "GET",
       "https://api.cristin.no/v2/persons/",
       query = list(
-        name = paste(name, collapse=" "),
+        name = name,
         institution = 209
       ),
       quiet = TRUE

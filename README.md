@@ -11,12 +11,12 @@ id="logo" title="Logo">
 </p>
 <p align="center">
 <a href="https://oeysan.github.io/c2z4uni/news/index.html" id="news" 
-title="News"><img src="https://img.shields.io/badge/News-2023.10.11 @ 16:19:52-purple.svg" alt="News"/></a><br/><a 
+title="News"><img src="https://img.shields.io/badge/News-2023.10.13 @ 11:40:28-purple.svg" alt="News"/></a><br/><a 
 href="https://cran.r-project.org/package=c2z4uni" id="cran" 
 title="CRAN Version"><img src="https://www.r-pkg.org/badges/version/c2z4uni" 
 alt="CRAN Version"/></a>
 <a href="https://github.com/oeysan/c2z4uni" id="github" 
-title="GitHub Version"><img src="https://img.shields.io/badge/GitHub-0.1.0.9002-orange.svg" alt="GitHub Version" /></a>
+title="GitHub Version"><img src="https://img.shields.io/badge/GitHub-0.1.0.9003-orange.svg" alt="GitHub Version" /></a>
 <br/><a href="https://oeysan.github.io/c2z4uni/LICENSE.html" id="license" 
 title="License">
 <img src="https://img.shields.io/badge/Licence-MIT-blue.svg" 
@@ -47,8 +47,8 @@ the project.
 ## Limitations
 
 Please report any bugs/issues/requests
-[here](https://github.com/oeysan/c2z4uni/issues/), and feel to make a
-[pull request](https://github.com/oeysan/c2z4uni/pulls).
+[here](https://github.com/oeysan/c2z4uni/issues/), and feel free to make
+a [pull request](https://github.com/oeysan/c2z4uni/pulls).
 
 ## Code of conduct
 

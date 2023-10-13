@@ -68,7 +68,7 @@ project.
 ## Limitations
 
 Please report any bugs/issues/requests
-[here](https://github.com/oeysan/c2z4uni/issues/), and feel to make a 
+[here](https://github.com/oeysan/c2z4uni/issues/), and feel free to make a 
 [pull request](https://github.com/oeysan/c2z4uni/pulls).
 
 ## Code of conduct
