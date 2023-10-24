@@ -119,8 +119,8 @@ CristinJson <- \(cristin.monthly,
       month,
       collections,
       sdg,
-      GoFish(unpaywall),
-      GoFish(ezproxy)
+      unpaywall = GoFish(unpaywall),
+      ezproxy = GoFish(ezproxy)
     )
 
   # Create json data

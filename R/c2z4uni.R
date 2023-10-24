@@ -126,7 +126,7 @@ Unpaywall <- \(doi, email = NULL) {
   if (is.null(email)) email <- Sys.getenv("CROSSREF_EMAIL")
 
   # Query Unpaywall
-  httr.get <- c2z:::Online(
+  httr.get <- Online(
     httr::RETRY(
       "GET",
       url = url,
@@ -428,7 +428,7 @@ SdgPredictions <- \(items, sdg.script, sdg.model, sdg.host) {
   }
 
   # Create tibble from predictions
-  sdg <- c2z:::JsonToTibble(httr.post$data)
+  sdg <- JsonToTibble(httr.post$data)
 
   return (sdg)
 
@@ -485,7 +485,7 @@ SdgInfo <- \(sdg.sum,
     # Find Norwegian urls
     if (lang == "no") {
 
-      httr.get <- c2z:::Online(
+      httr.get <- Online(
         httr::RETRY(
           "GET",
           "https://www.fn.no/om-fn/fns-baerekraftsmaal",
