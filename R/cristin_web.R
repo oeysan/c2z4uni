@@ -5,6 +5,7 @@
 #' @param sdg.data Data containing information about Sustainable Development
 #' Goals (SDGs). Default is NULL.
 #' @param sdg.path Path to SDG images. Default is NULL.
+#' @param archive.url Relative URL to archive. Default is NULL.
 #' @param local.storage Path to local storage directory. Default is NULL.
 #' @param user.cards Logical, indicating whether to update user information
 #' from INN. Default is TRUE.
@@ -51,6 +52,7 @@
 CristinWeb <- function(monthlies,
                        sdg.data = NULL,
                        sdg.path = NULL,
+                       archive.url = NULL,
                        local.storage = NULL,
                        user.cards = TRUE,
                        full.update = FALSE,
@@ -74,8 +76,9 @@ CristinWeb <- function(monthlies,
   CreateMd <- function(item) {
     # Visible bindings
     title <- reference <- abstract <- contributors <- sdg <- archive <-
-      reference.button <- abstract.button <- contributors.button <- sdg.button <-
-      cristin.button <- zotero.button <- archive.button <- NULL
+      unpaywall <- ezproxy <- reference.button <- abstract.button <-
+      contributors.button <- sdg.button <- cristin.button <- zotero.button <-
+      archive.button <- unpaywall.button <- ezproxy.button <- NULL
 
     # Function to create a vector of collection names
     CollectionNames <- function(x) {
@@ -118,8 +121,6 @@ CristinWeb <- function(monthlies,
       )
     }
 
-    htmltools::a(href = "test")
-
     # Contributors
     if (any(!is.na(GoFish(item$cristin.ids[[1]]))) &
         any(nrow(inn.cards))) {
@@ -158,7 +159,8 @@ CristinWeb <- function(monthlies,
             sdg.data$sum,
             as.numeric(item$sdg[[1]]),
             lang = lang,
-            sdg.path
+            sdg.path,
+            archive.url
           ) |>
             do.call(what = htmltools::HTML),
           class = "sdg-container"
@@ -191,6 +193,24 @@ CristinWeb <- function(monthlies,
       href = paste0("#", paste0("taxonomy-article-", item$key)),
       class = "csl-bib-button"
     )
+
+    # Unpaywall
+    if (any(!is.na(GoFish(item$unpaywall)))) {
+      unpaywall.button <- htmltools::a(
+        "Unpaywall",
+        href = item$unpaywall,
+        class = "csl-bib-button"
+      )
+    }
+
+    # Unpaywall
+    if (any(!is.na(GoFish(item$ezproxy)))) {
+      ezproxy.button <- htmltools::a(
+        "EZproxy",
+        href = item$ezproxy,
+        class = "csl-bib-button"
+      )
+    }
 
     # Add Cristin and Zotero buttons
     cristin.button <- htmltools::a(
@@ -225,6 +245,8 @@ CristinWeb <- function(monthlies,
           abstract.button,
           contributors.button,
           sdg.button,
+          unpaywall.button,
+          ezproxy.button,
           class = "csl-bib-buttons"
         ),
         htmltools::div(
@@ -254,7 +276,6 @@ CristinWeb <- function(monthlies,
 
     return (md)
   }
-
 
   # Markdownlist
   markdowns <- list()

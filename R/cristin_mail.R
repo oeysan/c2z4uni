@@ -3,6 +3,7 @@
 #' from Cristin.
 #' @param unit.key The key of the unit for which the email content is generated.
 #' @param cristin.monthly Data containing monthly information from Cristin.
+#' @param archive.host Host of the archive.
 #' @param subject The subject of the email. If not provided, it will be
 #' generated based on the data.
 #' @param header The header of the email. If not provided, it will be generated
@@ -14,9 +15,12 @@
 #' @param width Width of the email content in pixels.
 #' @param lang Language for localization ("nb", "nn", "no", or "en"). Defaults
 #' to "nn".
+#' @param get.ezproxy Use ezproxy, Default: FALSE
+#' @param ezproxy.host ezproxy host, Default: 'inn.no'
 #' @return A list containing the subject and HTML body of the email.
 #' @details Used with `CristinMonthly` to create month-to-month bibliography in
 #' HTML format for email of selected units
+#' @param silent c2z is noisy, tell it to be quiet, Default: FALSE
 #' @examples
 #' \donttest{
 #'   # Create monthlies for unit 209.5.10.0
@@ -34,7 +38,7 @@
 #'
 #'   # Create HTML email
 #'   if (any(nrow(example$monthlies))) {
-#'     example.mail <- CristinMail("209.5.10.0", example)
+#'     example.mail <- CristinMail("209.5.10.0", example, "example.host")
 #'
 #'     # Show subject
 #'     cat(example.mail$subject)
@@ -44,16 +48,20 @@
 #' @export
 CristinMail <- \(unit.key,
                  cristin.monthly,
+                 archive.host,
                  subject = NULL,
                  header = NULL,
                  footer = NULL,
                  replace.style = TRUE,
                  width = 700,
-                 lang = "nn") {
+                 lang = "nn",
+                 get.ezproxy = FALSE,
+                 ezproxy.host = "inn.no",
+                 silent = FALSE) {
 
   # Visible bindings
   body <- month.key <- year.month <- year <- id <- collections <-
-    collection.names <- NULL
+    collection.names <- bib.item <- bib.body <- key <- NULL
 
   # Languages
   # Set language to en if not no
@@ -62,6 +70,27 @@ CristinMail <- \(unit.key,
   # Definitions
   monthlies <- cristin.monthly$monthlies
   unit.paths <- cristin.monthly$unit.paths
+
+
+  # Function to add archive URL to publication
+  AddAchive <- \(bib.item, key, lang) {
+
+    bib.archive <- sprintf(
+      " | <a href=\"%1$s/%2$s/pub/%3$s\">%4$s</a>",
+      archive.host,
+      lang,
+      key,
+      Dict("archive", lang)
+    )
+    bib.item <- gsub(
+      "(</div>\\s*$)",
+      paste0(bib.archive, "\\1"),
+      bib.item,
+      perl = TRUE
+    )
+
+    return (bib.item)
+  }
 
   # Keep only latest entry
   bib <- monthlies |>
@@ -81,6 +110,12 @@ CristinMail <- \(unit.key,
       )
     ) |>
     dplyr::mutate(
+      bib.item = purrr::pmap_chr(
+        list(bib.item, key, lang), ~ AddAchive(...)
+      ),
+      bib = purrr::pmap_chr(
+        list(bib.body, bib.item), ~ sprintf(.x, .y)
+      ),
       dplyr::across(
         c(year, dplyr::starts_with("collection.name")), ~
           replace(.x, duplicated(.x), NA)
@@ -125,6 +160,17 @@ CristinMail <- \(unit.key,
     )
   }
 
+  # Append EZproxy if get.ezproxy = TRUE
+  if (get.ezproxy) {
+    bib <- bib |>
+      dplyr::mutate(
+        bib = purrr::map_chr(
+          bib, ~ Ezproxy(.x, TRUE, ezproxy.host),
+          .progress = if (!silent) "Defining EZproxy" else FALSE
+        )
+      )
+  }
+
   # Define subject
   if (is.null(subject)) {
     subject <- sprintf(
@@ -144,7 +190,8 @@ CristinMail <- \(unit.key,
         name = TRUE
       )),
       tolower(Month(bib$month[[1]], lang = lang)),
-      bib$year[[1]]
+      bib$year[[1]],
+      archive.host
     )
   }
 

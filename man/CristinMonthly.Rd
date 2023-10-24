@@ -8,13 +8,17 @@ CristinMonthly(
   zotero,
   unit.key,
   unit.recursive = TRUE,
+  sdg.script = NULL,
+  sdg.model = NULL,
+  sdg.cutoff = 0.98,
+  sdg.host = NULL,
+  get.unpaywall = FALSE,
+  get.ezproxy = FALSE,
+  ezproxy.host = "inn.no",
   local.storage = NULL,
   style = "apa-single-spaced",
   locale = "nn-NO",
   start.date = Sys.Date(),
-  sdg.script = NULL,
-  sdg.model = NULL,
-  sdg.cutoff = 0.98,
   end.date = NULL,
   use.filter = TRUE,
   filter = NULL,
@@ -36,6 +40,20 @@ CristinMonthly(
 
 \item{unit.recursive}{Find subunits of defined unit key, Default: TRUE}
 
+\item{sdg.script}{script to run SDG predictions, Default: NULL}
+
+\item{sdg.model}{model to use for SDG predictions, Default: NULL}
+
+\item{sdg.cutoff}{cut off value for SDG predictions, Default: '0.98'}
+
+\item{sdg.host}{host conducting SDG predictions, Default: NULL}
+
+\item{get.unpaywall}{Find Unpaywall resources, Default: FALSE}
+
+\item{get.ezproxy}{Use ezproxy, Default: FALSE}
+
+\item{ezproxy.host}{ezproxy host, Default: 'inn.no'}
+
 \item{local.storage}{Path to local storage of collections, items and
 bibliography, Default: 'NULL'}
 
@@ -46,12 +64,6 @@ citations, Default: 'apa-single-spaced'}
 
 \item{start.date}{Results created from specified date (YYYY-MM),
 Default: Sys.Date()}
-
-\item{sdg.script}{script to run SDG predictions, Default: NULL}
-
-\item{sdg.model}{model to use for SDG predictions, Default: NULL}
-
-\item{sdg.cutoff}{cut off value for SDG predictions, Default: '0.98'}
 
 \item{end.date}{Results created before specified date (YYYY-MM),
 Default: NULL}
@@ -89,8 +101,7 @@ A list with bibliography and information for defined units
 \description{
 Create a bibliography in a newsletter format from month-to-month
 From either a specified unit or a set of units (e.g., A University ->
-Faculties -> Departments -> Groups). The function has the ability to create
-HTML output designed for emails and/or webpages.
+Faculties -> Departments -> Groups).
 }
 \details{
 Used with `CristinUnits` to create month-to-month bibliography of

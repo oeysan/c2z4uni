@@ -7,18 +7,24 @@
 CristinMail(
   unit.key,
   cristin.monthly,
+  archive.host,
   subject = NULL,
   header = NULL,
   footer = NULL,
   replace.style = TRUE,
   width = 700,
-  lang = "nn"
+  lang = "nn",
+  get.ezproxy = FALSE,
+  ezproxy.host = "inn.no",
+  silent = FALSE
 )
 }
 \arguments{
 \item{unit.key}{The key of the unit for which the email content is generated.}
 
 \item{cristin.monthly}{Data containing monthly information from Cristin.}
+
+\item{archive.host}{Host of the archive.}
 
 \item{subject}{The subject of the email. If not provided, it will be
 generated based on the data.}
@@ -36,6 +42,12 @@ generated HTML.}
 
 \item{lang}{Language for localization ("nb", "nn", "no", or "en"). Defaults
 to "nn".}
+
+\item{get.ezproxy}{Use ezproxy, Default: FALSE}
+
+\item{ezproxy.host}{ezproxy host, Default: 'inn.no'}
+
+\item{silent}{c2z is noisy, tell it to be quiet, Default: FALSE}
 }
 \value{
 A list containing the subject and HTML body of the email.
@@ -65,7 +77,7 @@ HTML format for email of selected units
 
   # Create HTML email
   if (any(nrow(example$monthlies))) {
-    example.mail <- CristinMail("209.5.10.0", example)
+    example.mail <- CristinMail("209.5.10.0", example, "example.host")
 
     # Show subject
     cat(example.mail$subject)

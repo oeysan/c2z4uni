@@ -48,7 +48,7 @@ CristinJson <- \(cristin.monthly,
   # Visible bindings
   abstract <- bib.item <- key <- level <- month <- name <- parentCollection <-
     sdg <- title <- type <- year <- inn.cards <-  cristin.id <-
-    cristin.ids <- NULL
+    cristin.ids <- ezproxy <- unpaywall <- NULL
 
   # Languages
   # Set language to en if not no
@@ -118,7 +118,9 @@ CristinJson <- \(cristin.monthly,
       year,
       month,
       collections,
-      sdg
+      sdg,
+      GoFish(unpaywall),
+      GoFish(ezproxy)
     )
 
   # Create json data

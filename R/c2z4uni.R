@@ -53,6 +53,121 @@ zotero.types <- c2z::zotero.types
 ###############################Internal Functions###############################
 ################################################################################
 
+#' @title Ezproxy
+#' @keywords internal
+#' @noRd
+Ezproxy <- \(doi, href = FALSE, host = "inn.no") {
+
+  # Return NA if not found
+  if (any(is.na(doi))) {
+    return (NA)
+  }
+
+  # define ezproxy URL
+  ezproxy <- sprintf("http://ezproxy.%s/login?url=", host)
+  # define DOI base
+  doi.base <- "https://doi.org/"
+
+  # Search for DOI href if href = TRUE
+  if (href) {
+
+    # Return NA if href DOI not found
+    if (!grepl(paste0("href=\"", doi.base), doi)) {
+      return (doi)
+    }
+
+    # Insert ezproxy
+    doi <- gsub(
+      "href=\"https://doi",
+      paste0("href=\"", ezproxy, doi.base),
+      doi
+    )
+    # Else prefix ezproxy to DOI
+  } else {
+
+    # If doi.base in doi prefix ezproxy
+    if (grepl(doi.base, doi)) {
+
+      doi <- paste0(ezproxy, doi)
+      # Else prefix both ezproxy and doi.base
+    } else {
+
+      doi <- paste0(ezproxy, doi.base, doi)
+
+    }
+
+  }
+
+  return (doi)
+
+}
+
+#' @title GetDoi
+#' @keywords internal
+#' @noRd
+GetDoi <- \(doi, extra) {
+
+  # Try to get DOI from extra if DOI is NA
+  if (any(is.na(doi))) {
+    doi <- tail(ZoteroId("DOI", extra), 1)
+  }
+
+  return (doi)
+}
+
+#' @title Unpaywall
+#' @keywords internal
+#' @noRd
+Unpaywall <- \(doi, email = NULL) {
+
+  # Define url to Unpaywall api
+  url <- paste0("https://api.unpaywall.org/v2/", doi)
+  # Set email if empty
+  if (is.null(email)) email <- Sys.getenv("CROSSREF_EMAIL")
+
+  # Query Unpaywall
+  httr.get <- c2z:::Online(
+    httr::RETRY(
+      "GET",
+      url = url,
+      query = list(
+        email = email
+      ),
+      quiet = TRUE
+    ),
+    silent = TRUE
+  )
+
+  # Return NA if not found
+  if (httr.get$error) {
+    return (NA)
+  }
+
+  # Create list from JSON
+  unpaywall <- httr::content(httr.get$data)
+
+  # Return NA if not open source
+  if (!any(GoFish(unpaywall$is_oa, FALSE))) {
+    return (NA)
+  }
+
+  # Try to get location of pdf
+  open.access <- GoFish(unpaywall$best_oa_location$url_for_pdf)
+
+  # if open.access is not defined try URL
+  if (any(is.na(open.access))) {
+    open.access <- GoFish(unpaywall$best_oa_location$url)
+  }
+
+  # if open.access is not defined try landing site
+  if (any(is.na(open.access))) {
+    open.access <- GoFish(unpaywall$best_oa_location$url_for_landing_page)
+  }
+
+  return (open.access)
+
+}
+
 #' @title CheckDesc
 #' @keywords internal
 #' @noRd
@@ -242,10 +357,10 @@ FindNvi <- \(data) {
 #' @title SdgPredictions
 #' @keywords internal
 #' @noRd
-SdgPredictions <- \(items, sdg.script, sdg.model) {
+SdgPredictions <- \(items, sdg.script, sdg.model, sdg.host) {
 
   # Visible bindings
-  cutoff <- sum <- abstractNote <- key <- NULL
+  cutoff <- sum <- abstractNote <- key <- process <- NULL
 
   # Find abstracts
   abstracts <- items |>
@@ -268,19 +383,24 @@ SdgPredictions <- \(items, sdg.script, sdg.model) {
   abstracts.file <- gsub("\\\\", "/", file.path(tempdir(), "abstracts.csv"))
   readr::write_excel_csv(abstracts, abstracts.file)
 
-  # Run Python script in the background
-  process <- processx::process$new(
-    "python",
-    args = c(sdg.script, "--model_dir", dirname(sdg.model)),
-    stdout =  file.path(tempdir(),"sdg_output.txt"),
-    stderr = file.path(tempdir(),"sdg_error.txt")
-  )
+  # Run Python script if sdg.host is not defined
+  if (is.null(sdg.host)) {
 
-  # Wait for a moment to ensure the Python script has started
-  Sys.sleep(5)
+    # Run Python script in the background
+    process <- processx::process$new(
+      "python",
+      args = c(sdg.script, "--model_dir", dirname(sdg.model)),
+      stdout =  file.path(tempdir(),"sdg_output.txt"),
+      stderr = file.path(tempdir(),"sdg_error.txt")
+    )
 
-  # Define host (should be localhost at post 6963)
-  sdg.host <- "http://localhost:6963/"
+    # Wait for a moment to ensure the Python script has started
+    Sys.sleep(5)
+
+    # Define host (should be localhost at post 6963)
+    sdg.host <- "http://localhost:6963/"
+
+  }
 
   # Create params for model
   params <- list(
@@ -300,7 +420,7 @@ SdgPredictions <- \(items, sdg.script, sdg.model) {
   )
 
   # Terminate the Python process when done
-  process$kill()
+  if (!is.null(process)) process$kill()
 
   # Return NA if not found
   if (httr.post$error) {
@@ -353,7 +473,8 @@ SdgCutoff <- \(sdg, sdg.cutoff = 0.98) {
 SdgInfo <- \(sdg.sum,
              range = NULL,
              lang = "no",
-             sdg.path = NULL) {
+             sdg.path = NULL,
+             archive.url = NULL) {
 
   # Languages
   # Set language to en if not nb or nn
@@ -372,6 +493,7 @@ SdgInfo <- \(sdg.sum,
           quiet = TRUE),
         silent = TRUE
       )
+
       sdg.urls <- httr.get$data |>
         rvest::read_html() |>
         rvest::html_nodes(".header_gols_content_list li a") |>
@@ -400,7 +522,8 @@ SdgInfo <- \(sdg.sum,
   for (i in sdgs) {
     sdg.id <- sprintf("sdg%d", i)
     if (is.null(sdg.path)) sdg.path <- "/images/sdg"
-    sdg.image <- file.path(sdg.path, sprintf("sdg%02d_%s.png",i, lang))
+    sdg.archive.url <- paste0(archive.url, paste0("?sdg=", i, "#archive"))
+    sdg.image <- file.path(sdg.path, sprintf("sdg%02d_%s.png", i, lang))
     sdg.publications <- Dict("publications", lang, sdg.sum[[i]])
     sdg.span <- sprintf("%s", sdg.sum[[i]])
     sdg.url <- sprintf("%s", sdg.urls[[i]])
@@ -410,13 +533,14 @@ SdgInfo <- \(sdg.sum,
       '<div id="%s" class="sdg">
         <img src="%s" class="image" alt="SDG %d">
         <div class="sdg-overlay">
-          <p class="sdg-publication-count"><span>%s</span> %s</p>
+          <a href="%s" class="sdg-publication-count"><span>%s</span> %s</a>
           <p><a href="%s" class="sdg-read-more">%s</a></p>
         </div>
       </div>',
       sdg.id,
       sdg.image,
       i,
+      sdg.archive.url,
       sdg.span,
       sdg.publications,
       sdg.url,
@@ -438,9 +562,6 @@ SdgInfo <- \(sdg.sum,
 CreateMonthlies <- \(zotero,
                      unit.paths,
                      collections,
-                     sdg.script,
-                     sdg.model,
-                     sdg.cutoff,
                      local.storage,
                      full.update,
                      lang,
@@ -452,47 +573,14 @@ CreateMonthlies <- \(zotero,
   # Visible bindings
   new.zotero <- key <- missing.keys <- version.x <- version.y <- name <- id <-
     cristin.id <- year <- month <- items <- bibliography <- monthlies <-
-    inn.cards <- sdg <- new.keys <- where <- key <- abstractNote <- NULL
-
-  # Function to fetch sdgs for items
-  FetchSdg <- \(x, sdg, sdg.cutoff) {
-
-    if (!any(nrow(sdg))) {
-      return (NULL)
-    }
-
-    sdgs <- SdgCutoff(sdg, sdg.cutoff)$cutoff |>
-      filter(key == x & dplyr::if_any(dplyr::where(is.numeric)) > 0) |>
-      select(where(~ all(.x > 0)), -key)
-    if (any(nrow(sdgs))) gsub("\\D+", "", names(sdgs))
-
-  }
+    inn.cards <- new.keys <- where <- key <- abstractNote <- NULL
 
   # Function to enhance bibliography
   EnhanceBib <- \(items,
                   bibliography,
                   collections,
                   unit.paths,
-                  sdg,
-                  sdg.cutoff,
                   silent) {
-
-    CreateCreators <- \(x) {
-      AddMissing(
-        x,
-        c("name",
-          "firstName",
-          "lastName"),
-        na.type = NA_character_,
-        location = NULL
-      ) |>
-        transmute(
-          names = case_when(
-            !is.na(name) ~ name,
-            TRUE ~ paste(lastName, firstName, sep = ", ")
-          )
-        )
-    }
 
     CollectionNames <- \(unit.paths, collections, cristin.id) {
       # Filter out collections found in unit.paths
@@ -536,46 +624,14 @@ CreateMonthlies <- \(zotero,
 
     }
 
-    # order bibliography according to item
-    bibliography <- bibliography |>
-      dplyr::arrange(match(key, items$key))
-
     bib <- bibliography |>
       dplyr::arrange(match(key, items$key)) |>
       dplyr::mutate(
         cristin.id = ZoteroId("Cristin", items$extra),
-        title = GoFish(items$title),
-        type = GoFish(items$itemType),
-        abstract = GoFish(items$abstractNote),
-        cristin.url = paste0(
-          "https://app.cristin.no/results/show.jsf?id=",
-          cristin.id
-        ),
-        zotero.url = sprintf(
-          "http://zotero.org/%s/items/%s", items$prefix, key
-        ),
-        creators = purrr::map(items$creators, ~ CreateCreators(.x),
-                              .progress = TRUE),
-        cristin.ids = purrr::map(
-          cristin.id, ~ CristinId(.x),
-          .progress = !silent),
         collections = items$collections,
         collection.names = purrr::pmap(
           list(collections, cristin.id), ~ CollectionNames(unit.paths, .x, .y),
-          .progress = !silent
-        ),
-        sdg = purrr::map(
-          key, ~ FetchSdg(.x, sdg, sdg.cutoff), .progress = TRUE
-        ),
-        month = purrr::map_int(collections, ~ {
-          .env$collections |>
-            dplyr::filter(
-              key %in% .x, grepl("^\\d{1,2}: [A-Za-z]+$", name)
-            ) |>
-            dplyr::pull(name) |>
-            (\(x) as.numeric(gsub("\\D", "", x[[1]])))()
-        },
-        .progress = !silent
+          .progress = if (!silent) "Finding collections" else FALSE
         ),
         year = purrr::map_int(collections, ~ {
           .env$collections |>
@@ -585,7 +641,17 @@ CreateMonthlies <- \(zotero,
             dplyr::pull(name) |>
             (\(x) as.numeric(x)[[1]])()
         },
-        .progress = !silent
+        .progress = if (!silent) "Finding year" else FALSE
+        ),
+        month = purrr::map_int(collections, ~ {
+          .env$collections |>
+            dplyr::filter(
+              key %in% .x, grepl("^\\d{1,2}: [A-Za-z]+$", name)
+            ) |>
+            dplyr::pull(name) |>
+            (\(x) as.numeric(gsub("\\D", "", x[[1]])))()
+        },
+        .progress = if (!silent) "Finding month" else FALSE
         ),
         year.month = paste0(year, "_" , AddPad(month, 2))
       )
@@ -644,7 +710,6 @@ CreateMonthlies <- \(zotero,
         items <- items |>
           filter(key %in% check.items$key)
       }
-      #
       if (any(nrow(bibliography))) {
         bibliography <- bibliography |>
           filter(key %in% check.items$key)
@@ -657,7 +722,8 @@ CreateMonthlies <- \(zotero,
     # Check if there are keys in items that are not in bibliography
     if (any(nrow(items) > nrow(bibliography))) {
       missing.keys <- items |>
-        dplyr::anti_join(bibliography, by = "key")
+        dplyr::anti_join(bibliography, by = "key") |>
+        dplyr::pull(key)
       new.keys <- unique(c(new.keys, missing.keys))
     }
 
@@ -753,39 +819,6 @@ CreateMonthlies <- \(zotero,
 
   }
 
-
-  # Try to restore sdgs to local storage if defined
-  if (!is.null(local.storage)) {
-
-    # Log monthly bibliographies for Cristin
-    log <-  LogCat(
-      "Creating SDG predictions (this may take awhile)",
-      silent = silent,
-      log = log
-    )
-
-    sdg <- GoFish(
-      readRDS(file.path(local.storage, "sdg_predictions.rds")),
-      NULL
-    )
-
-    # Update sdg if new items
-    if (any(nrow(new.zotero$results)) & !is.null(sdg.script)) {
-      new.sdg <- SdgPredictions(new.zotero$results, sdg.script, sdg.model)
-
-      # Update or insert sdg
-      if (any(nrow(new.sdg))) {
-        sdg <- UpdateInsert(sdg, new.sdg)
-      }
-    }
-
-  }
-
-  # Run sdg model if
-  if ((full.update | !any(nrow(sdg))) & !is.null(sdg.script)) {
-    sdg <- SdgPredictions(items, sdg.script, sdg.model)
-  }
-
   # Log monthly bibliographies for Cristin
   log <-  LogCat(
     "Creating monthly bibliographies",
@@ -812,8 +845,6 @@ CreateMonthlies <- \(zotero,
         new.zotero$bibliography,
         collections,
         unit.paths,
-        sdg,
-        sdg.cutoff,
         silent
       )
 
@@ -832,8 +863,6 @@ CreateMonthlies <- \(zotero,
       bibliography,
       collections,
       unit.paths,
-      sdg,
-      sdg.cutoff,
       silent
     )
 
@@ -841,19 +870,6 @@ CreateMonthlies <- \(zotero,
 
   # Save data to local storage if defined
   if (!is.null(local.storage)) {
-
-    if (any(nrow(sdg))) {
-      # Log
-      log <-  LogCat(
-        "Saving SDG predictions",
-        silent = silent,
-        log = log
-      )
-      saveRDS(
-        sdg,
-        file.path(local.storage, "sdg_predictions.rds")
-      )
-    }
 
     if (any(nrow(monthlies))) {
       # Log
@@ -876,9 +892,261 @@ CreateMonthlies <- \(zotero,
   # Create return.list
   return.list <- list(
     items = items,
-    bibliography = bibliography,
     monthlies = monthlies,
-    updated.keys = new.keys
+    updated.keys = new.keys,
+    log = log
+  )
+
+  return (return.list)
+
+}
+
+
+#' @title CreateExtras
+#' @keywords internal
+#' @noRd
+CreateExtras <- \(monthlies,
+                  sdg.script,
+                  sdg.model,
+                  sdg.cutoff,
+                  sdg.host,
+                  get.unpaywall,
+                  get.ezproxy,
+                  ezproxy.host,
+                  local.storage,
+                  full.update,
+                  lang,
+                  silent,
+                  log = list()) {
+
+  # Visible bindings
+  sdg <- new.items <- missing.items <- where <- key <- title <- itemType <-
+    abstractNote <- extra <- cristin.id <- prefix <- ISBN <- DOI <-
+    doi <- extras <- NULL
+
+  # Function to fetch sdgs for items
+  FetchSdg <- \(x, sdg, sdg.cutoff) {
+
+    if (!any(nrow(sdg))) {
+      return (NULL)
+    }
+
+    sdgs <- SdgCutoff(sdg, sdg.cutoff)$cutoff |>
+      filter(key == x & dplyr::if_any(dplyr::where(is.numeric)) > 0) |>
+      dplyr::select(where(~ all(.x > 0)), -key)
+    if (any(nrow(sdgs))) gsub("\\D+", "", names(sdgs))
+
+  }
+
+  # Function to enhance bibliography
+  GetExtras <- \(items,
+                 sdg,
+                 sdg.cutoff,
+                 get.unpaywall,
+                 get.ezproxy,
+                 ezproxy.host,
+                 silent) {
+
+    extras <- items |>
+      dplyr::transmute(
+        key,
+        title,
+        type = itemType,
+        abstract = abstractNote,
+        cristin.id = ZoteroId("Cristin", extra),
+        cristin.url = paste0(
+          "https://app.cristin.no/results/show.jsf?id=",
+          cristin.id
+        ),
+        zotero.url = sprintf(
+          "http://zotero.org/%s/items/%s", prefix, key
+        ),
+        cristin.ids = purrr::map(
+          cristin.id, ~ CristinId(.x),
+          .progress = if (!silent) "Finding Cristin IDs" else FALSE
+        ),
+        isbn = GoFish(ISBN),
+        doi =  purrr::pmap_chr(
+          list(GoFish(DOI), GoFish(extra)), ~
+            GetDoi(...),
+          .progress = if (!silent) "Finding DOI" else FALSE
+        ),
+        extra
+      )
+
+    # Add SDG if sdg.model is defined
+    if (!is.null(sdg.model)) {
+      extras <- extras |>
+        dplyr::mutate(
+          sdg = purrr::map(
+            key, ~ FetchSdg(.x, sdg, sdg.cutoff),
+            .progress = if (!silent) "Finding SDGs" else FALSE
+          )
+        )
+    }
+
+    # Add unpaywall if get.unpaywall is TRUE
+    if (get.unpaywall) {
+
+      extras <- extras |>
+        dplyr::mutate(
+          unpaywall =  purrr::map_chr(
+            doi, ~ Unpaywall(.x),
+            .progress = if (!silent) "Searching Unpaywall" else FALSE
+          )
+        )
+    }
+
+    # Add ezproxy if get.ezproxy is TRUE
+    if (get.ezproxy) {
+      extras <- extras |>
+        dplyr::mutate(
+          ezproxy =
+            dplyr::case_when(
+              !is.na(GoFish(unpaywall)) ~ NA_character_,
+              TRUE ~ purrr::map_chr(
+                doi, ~ Ezproxy(.x, host = ezproxy.host),
+                .progress = if (!silent) "Defining EZproxy" else FALSE
+              )
+            )
+        )
+    }
+
+    return (extras)
+
+  }
+
+  # Try to restore sdgs to local storage if defined
+  if (!is.null(local.storage) & !is.null(sdg.model)) {
+
+    # Log monthly bibliographies for Cristin
+    log <-  LogCat(
+      "Creating SDG predictions (this may take awhile)",
+      silent = silent,
+      log = log
+    )
+
+    # Check if any sdg predictions exist
+    sdg <- GoFish(
+      readRDS(file.path(local.storage, "sdg_predictions.rds")),
+      NULL
+    )
+
+    # Check if any missing items
+    missing.items <- monthlies$items |>
+      dplyr::anti_join(sdg, by = "key") |>
+      GoFish()
+
+    # Update sdg if missing items
+    if (any(nrow(missing.items))) {
+      new.sdg <- SdgPredictions(
+        missing.items,
+        sdg.script,
+        sdg.model,
+        sdg.host
+      )
+
+      # Update or insert sdg
+      if (any(nrow(new.sdg))) {
+        sdg <- UpdateInsert(sdg, new.sdg)
+      }
+    }
+  }
+
+  # Run full sdg predictions if full update or sdg are empty
+  if ((full.update | !any(nrow(sdg))) & !is.null(sdg.model)) {
+    sdg <- SdgPredictions(monthlies$items, sdg.script, sdg.model, sdg.host)
+  }
+
+  # Save data to local storage if defined
+  if (!is.null(local.storage) & !is.null(sdg.model)) {
+
+    if (any(nrow(sdg))) {
+      # Log
+      log <-  LogCat(
+        "Saving SDG predictions",
+        silent = silent,
+        log = log
+      )
+      saveRDS(
+        sdg,
+        file.path(local.storage, "sdg_predictions.rds")
+      )
+    }
+  }
+
+  # Try to restore monthlies to local storage if defined
+  if (!is.null(local.storage)) {
+
+    extras <- GoFish(
+      readRDS(file.path(local.storage, "monthlies_extras.rds")),
+      NULL
+    )
+
+    # Check if any missing items
+    missing.items <- monthlies$items |>
+      dplyr::anti_join(extras, by = "key") |>
+      GoFish()
+
+    # Update if new items
+    if (any(nrow(missing.items))) {
+
+      # Create monthlies for new items
+      new.extras <- GetExtras(
+        missing.items,
+        sdg,
+        sdg.cutoff,
+        get.unpaywall,
+        get.ezproxy,
+        ezproxy.host,
+        silent
+      )
+
+      # Update or insert items
+      extras <- UpdateInsert(extras, new.extras)
+
+    }
+
+  }
+
+  # Run full update if full.update is TRUE or monthlies are missing
+  if (full.update | !any(nrow(extras))) {
+
+    extras <- GetExtras(
+      monthlies$items,
+      sdg,
+      sdg.cutoff,
+      get.unpaywall,
+      get.ezproxy,
+      ezproxy.host,
+      silent
+    )
+
+  }
+
+  # Save data to local storage if defined
+  if (!is.null(local.storage)) {
+
+    if (any(nrow(extras))) {
+      # Log
+      log <-  LogCat(
+        "Saving extras to database",
+        silent = silent,
+        log = log
+      )
+      saveRDS(
+        extras,
+        file.path(local.storage, "monthlies_extras.rds")
+      )
+    }
+
+  }
+
+  # Create return.list
+  return.list <- list(
+    extras = extras,
+    sdg = sdg,
+    log = log
   )
 
   return (return.list)
@@ -1808,7 +2076,6 @@ Online <- \(query,
 #' @keywords internal
 #' @noRd
 FixCreators <- \(data = NULL) {
-
 
   if (all(is.na(GoFish(data)))) {
     return (NULL)

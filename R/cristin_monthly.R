@@ -1,14 +1,17 @@
 #' @title Create a month-to-month bibliography of selected units
 #' @description Create a bibliography in a newsletter format from month-to-month
 #' From either a specified unit or a set of units (e.g., A University ->
-#' Faculties -> Departments -> Groups). The function has the ability to create
-#' HTML output designed for emails and/or webpages.
+#' Faculties -> Departments -> Groups).
 #' @param zotero What Zotero library to use
 #' @param unit.key What unit to search for
 #' @param unit.recursive Find subunits of defined unit key, Default: TRUE
 #' @param sdg.script script to run SDG predictions, Default: NULL
 #' @param sdg.model model to use for SDG predictions, Default: NULL
 #' @param sdg.cutoff cut off value for SDG predictions, Default: '0.98'
+#' @param sdg.host host conducting SDG predictions, Default: NULL
+#' @param get.unpaywall Find Unpaywall resources, Default: FALSE
+#' @param get.ezproxy Use ezproxy, Default: FALSE
+#' @param ezproxy.host ezproxy host, Default: 'inn.no'
 #' @param local.storage Path to local storage of collections, items and
 #' bibliography, Default: 'NULL'
 #' @param style Citation style to use for appended bibliography and/or
@@ -77,13 +80,17 @@
 CristinMonthly <- \(zotero,
                     unit.key,
                     unit.recursive = TRUE,
+                    sdg.script = NULL,
+                    sdg.model = NULL,
+                    sdg.cutoff = 0.98,
+                    sdg.host = NULL,
+                    get.unpaywall = FALSE,
+                    get.ezproxy = FALSE,
+                    ezproxy.host = "inn.no",
                     local.storage = NULL,
                     style = "apa-single-spaced",
                     locale = "nn-NO",
                     start.date = Sys.Date(),
-                    sdg.script = NULL,
-                    sdg.model = NULL,
-                    sdg.cutoff = 0.98,
                     end.date = NULL,
                     use.filter = TRUE,
                     filter = NULL,
@@ -104,7 +111,7 @@ CristinMonthly <- \(zotero,
     destination.key <- lang.month <- bib <- bib.body <- bib.web <- abstract <-
     new.keys <- examine.items <- monthlies <- version.x <-
     version.y <- collections <- log.eta <- id <- multidepartmental <-
-    duplicates <-  NULL
+    duplicates <- extras <- cristin.id <- NULL
 
   # Languages
   # Set language to en if not no
@@ -340,9 +347,7 @@ CristinMonthly <- \(zotero,
         )
 
         # Save items
-        saveRDS(
-          zotero$items, file.path(local.storage, "items.rds")
-        )
+        saveRDS(zotero$items, file.path(local.storage, "items.rds"))
 
       }
     }
@@ -427,13 +432,6 @@ CristinMonthly <- \(zotero,
 
     # Find multidepartmental and duplicate items if any items
     if (any(nrow(items))) {
-
-      # Log Cristin search
-      zotero$log <-  LogCat(
-        "Searching for duplicates and multidepartmental publications",
-        silent = silent,
-        log = zotero$log
-      )
 
       # Examine items
       if (check.items) {
@@ -549,13 +547,10 @@ CristinMonthly <- \(zotero,
   }
 
   # Create Monthlies
-  update.bibliography <- CreateMonthlies(
+  monthlies <- CreateMonthlies(
     zotero,
     unit.paths,
     collections,
-    sdg.script,
-    sdg.model,
-    sdg.cutoff,
     local.storage,
     full.update,
     lang,
@@ -565,26 +560,62 @@ CristinMonthly <- \(zotero,
     log = zotero$log
   )
 
+  # Create extras if any monthlies
+  if (any(nrow(monthlies$items))) {
+    extras <- CreateExtras(
+      monthlies,
+      sdg.script,
+      sdg.model,
+      sdg.cutoff,
+      sdg.host,
+      get.unpaywall,
+      get.ezproxy,
+      ezproxy.host,
+      local.storage,
+      full.update,
+      lang,
+      silent,
+      log = monthlies$log
+    )
+  }
+
   # Find multidepartmental and duplicate items
-  if (check.items & any(nrow(update.bibliography$items))) {
+  if (check.items & any(nrow(monthlies$items))) {
+
+    # Log examine items
+    extras$log <-  LogCat(
+      "Searching for duplicates and multidepartmental publications",
+      silent = silent,
+      log = extras$log
+    )
+
     examine.items <- ExamineItems(
-      update.bibliography$items,
+      monthlies$items,
       collections,
       silent,
-      zotero$log,
+      extras$log,
       n.paths
     )
     multidepartmental <- examine.items$multidepartmental
     duplicates <- examine.items$duplicates
   }
 
+
+  # Join monthlies and extras
+  if (any(nrow(monthlies$monthlies)) & any(nrow(extras$extras))) {
+    monthlies$monthlies <- monthlies$monthlies |>
+      dplyr::left_join(dplyr::select(extras$extras, -cristin.id), by = join_by(key))
+  }
+
   # Create return.list
   return.list <- list(
     unit.paths = unit.paths,
-    monthlies = update.bibliography$monthlies,
-    updated.keys = update.bibliography$updated.keys,
+    monthlies =  monthlies$monthlies,
+    sdg = extras$sdg,
+    updated.keys = monthlies$updated.keys,
     multidepartmental = multidepartmental,
-    duplicates = duplicates
+    duplicates = duplicates,
+    log = examine.items$log
   )
 
   return(return.list)

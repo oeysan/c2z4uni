@@ -1,9 +1,25 @@
 # c2z4uni (development version)
 
+#### Features
+
+* `CristinMonthly` can now conduct SDG predictions derived from 
+Vanderfeesten et al. (2022). Either using a self-hosted python script and models
+or a user-defined host with proper using proper BERT-models
+
+* `CristinMonthly` can now check for open source publications using `Unpaywall`
+(set `get.unpaywall` to TRUE) and/or use `get.ezproxy` to append a EZproxy as
+defined by `ezproxy.host`
+
 #### Minor 
 
+* Separated `CristinMonthly` into a main function an two internal helper 
+functions: `CreateMonthlies` and `CreateExtras`. `CreateMonthlies` will create
+the main monthly bibliographies and store (if `local.storage` is defined) at 
+`monthlies_LANG.rds`, similary `CreateExtras` will store extra metadata (e.g.,
+SDG predictions, Unpaywall links, EZproxy links etc.) in `monthlies.extras.rds`
+
 * Some minor adjustment to the internal function `InnCristin`, that now only 
-searches for first and last name. 
+searches for first and last name
 * Added a missing profile image icon to user cards
 
 #### Bug fixes
