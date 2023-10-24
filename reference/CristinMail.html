@@ -18,7 +18,7 @@ from Cristin."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/li
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9004</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9005</span>
       </span>
     </div>
 
@@ -58,12 +58,16 @@ from Cristin.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">CristinMail</span><span class="op">(</span></span>
 <span>  <span class="va">unit.key</span>,</span>
 <span>  <span class="va">cristin.monthly</span>,</span>
+<span>  <span class="va">archive.host</span>,</span>
 <span>  subject <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  header <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  footer <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  replace.style <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  width <span class="op">=</span> <span class="fl">700</span>,</span>
-<span>  lang <span class="op">=</span> <span class="st">"nn"</span></span>
+<span>  lang <span class="op">=</span> <span class="st">"nn"</span>,</span>
+<span>  get.ezproxy <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  ezproxy.host <span class="op">=</span> <span class="st">"inn.no"</span>,</span>
+<span>  silent <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -75,6 +79,10 @@ from Cristin.</p>
 
 <dt>cristin.monthly</dt>
 <dd><p>Data containing monthly information from Cristin.</p></dd>
+
+
+<dt>archive.host</dt>
+<dd><p>Host of the archive.</p></dd>
 
 
 <dt>subject</dt>
@@ -104,6 +112,18 @@ generated HTML.</p></dd>
 <dt>lang</dt>
 <dd><p>Language for localization ("nb", "nn", "no", or "en"). Defaults
 to "nn".</p></dd>
+
+
+<dt>get.ezproxy</dt>
+<dd><p>Use ezproxy, Default: FALSE</p></dd>
+
+
+<dt>ezproxy.host</dt>
+<dd><p>ezproxy host, Default: 'inn.no'</p></dd>
+
+
+<dt>silent</dt>
+<dd><p>c2z is noisy, tell it to be quiet, Default: FALSE</p></dd>
 
 </dl></div>
     <div id="value">
@@ -143,7 +163,7 @@ HTML format for email of selected units</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>  <span class="co"># Create HTML email</span></span></span>
 <span class="r-in"><span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/any.html" class="external-link">any</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">example</span><span class="op">$</span><span class="va">monthlies</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>    <span class="va">example.mail</span> <span class="op">&lt;-</span> <span class="fu">CristinMail</span><span class="op">(</span><span class="st">"209.5.10.0"</span>, <span class="va">example</span><span class="op">)</span></span></span>
+<span class="r-in"><span>    <span class="va">example.mail</span> <span class="op">&lt;-</span> <span class="fu">CristinMail</span><span class="op">(</span><span class="st">"209.5.10.0"</span>, <span class="va">example</span>, <span class="st">"example.host"</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>    <span class="co"># Show subject</span></span></span>
 <span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">example.mail</span><span class="op">$</span><span class="va">subject</span><span class="op">)</span></span></span>

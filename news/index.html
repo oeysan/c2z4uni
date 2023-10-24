@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9004</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9005</span>
       </span>
     </div>
 
@@ -50,9 +50,15 @@
     <div class="section level2">
 <h2 class="page-header" data-toc-text="development version" id="c2z4uni-development-version">c2z4uni (development version)<a class="anchor" aria-label="anchor" href="#c2z4uni-development-version"></a></h2>
 <div class="section level5">
+<h5 id="features-development-version">Features<a class="anchor" aria-label="anchor" href="#features-development-version"></a></h5>
+<ul><li><p><code>CristinMonthly</code> can now conduct SDG predictions derived from Vanderfeesten et al. (2022). Either using a self-hosted python script and models or a user-defined host with proper using proper BERT-models</p></li>
+<li><p><code>CristinMonthly</code> can now check for open source publications using <code>Unpaywall</code> (set <code>get.unpaywall</code> to TRUE) and/or use <code>get.ezproxy</code> to append a EZproxy as defined by <code>ezproxy.host</code></p></li>
+</ul></div>
+<div class="section level5">
 <h5 id="minor-development-version">Minor<a class="anchor" aria-label="anchor" href="#minor-development-version"></a></h5>
-<ul><li>Some minor adjustment to the internal function <code>InnCristin</code>, that now only searches for first and last name.</li>
-<li>Added a missing profile image icon to user cards</li>
+<ul><li><p>Separated <code>CristinMonthly</code> into a main function an two internal helper functions: <code>CreateMonthlies</code> and <code>CreateExtras</code>. <code>CreateMonthlies</code> will create the main monthly bibliographies and store (if <code>local.storage</code> is defined) at <code>monthlies_LANG.rds</code>, similary <code>CreateExtras</code> will store extra metadata (e.g., SDG predictions, Unpaywall links, EZproxy links etc.) in <code>monthlies.extras.rds</code></p></li>
+<li><p>Some minor adjustment to the internal function <code>InnCristin</code>, that now only searches for first and last name</p></li>
+<li><p>Added a missing profile image icon to user cards</p></li>
 </ul></div>
 <div class="section level5">
 <h5 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h5>
