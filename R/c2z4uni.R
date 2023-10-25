@@ -934,8 +934,10 @@ CreateExtras <- \(monthlies,
     }
 
     sdgs <- SdgCutoff(sdg, sdg.cutoff)$cutoff |>
+      dplyr::select(c(key, dplyr::starts_with("sdg"))) |>
       filter(key == x & dplyr::if_any(dplyr::where(is.numeric)) > 0) |>
       dplyr::select(where(~ all(.x > 0)), -key)
+
     if (any(nrow(sdgs))) gsub("\\D+", "", names(sdgs))
 
   }
