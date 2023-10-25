@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9006</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9007</span>
       </span>
     </div>
 
@@ -56,7 +56,8 @@
 </ul></div>
 <div class="section level5">
 <h5 id="minor-development-version">Minor<a class="anchor" aria-label="anchor" href="#minor-development-version"></a></h5>
-<ul><li><p>Separated <code>CristinMonthly</code> into a main function an two internal helper functions: <code>CreateMonthlies</code> and <code>CreateExtras</code>. <code>CreateMonthlies</code> will create the main monthly bibliographies and store (if <code>local.storage</code> is defined) at <code>monthlies_LANG.rds</code>, similary <code>CreateExtras</code> will store extra metadata (e.g., SDG predictions, Unpaywall links, EZproxy links etc.) in <code>monthlies.extras.rds</code></p></li>
+<ul><li><p>SDG’s, bibliographies, monthlies and extras should all now use key and version to update <code>rds</code> files in <code>local.storage</code>.</p></li>
+<li><p>Separated <code>CristinMonthly</code> into a main function an two internal helper functions: <code>CreateMonthlies</code> and <code>CreateExtras</code>. <code>CreateMonthlies</code> will create the main monthly bibliographies and store (if <code>local.storage</code> is defined) at <code>monthlies_LANG.rds</code>, similary <code>CreateExtras</code> will store extra metadata (e.g., SDG predictions, Unpaywall links, EZproxy links etc.) in <code>monthlies.extras.rds</code></p></li>
 <li><p>Some minor adjustment to the internal function <code>InnCristin</code>, that now only searches for first and last name</p></li>
 <li><p>Added a missing profile image icon to user cards</p></li>
 </ul></div>
