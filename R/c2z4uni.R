@@ -433,7 +433,7 @@ SdgPredictions <- \(items, sdg.script, sdg.model, sdg.host) {
   if (any(nrow(sdg))) {
     sdg <- sdg |>
       dplyr::arrange(match(key, items$key)) |>
-      dplyr::left_join(dplyr::select(items, c(key, version))) |>
+      dplyr::left_join(dplyr::select(items, c(key, version)), by = "key") |>
       dplyr::select(key, version, dplyr::everything())
   }
 
@@ -1024,7 +1024,7 @@ CreateExtras <- \(monthlies,
   # Try to restore sdgs to local storage if defined
   if (!is.null(local.storage) & !is.null(sdg.model)) {
 
-    # Log monthly bibliographies for Cristin
+    # Log SDG predictions
     log <-  LogCat(
       "Creating SDG predictions (this may take awhile)",
       silent = silent,
@@ -1082,6 +1082,13 @@ CreateExtras <- \(monthlies,
 
   # Try to restore monthlies to local storage if defined
   if (!is.null(local.storage)) {
+
+    # Log Extras
+    log <-  LogCat(
+      "Creating extras",
+      silent = silent,
+      log = log
+    )
 
     extras <- GoFish(
       readRDS(file.path(local.storage, "monthlies_extras.rds")),
