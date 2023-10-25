@@ -600,11 +600,11 @@ CristinMonthly <- \(zotero,
     duplicates <- examine.items$duplicates
   }
 
-
   # Join monthlies and extras
   if (any(nrow(monthlies$monthlies)) & any(nrow(extras$extras))) {
     monthlies$monthlies <- monthlies$monthlies |>
-      dplyr::left_join(dplyr::select(extras$extras, -cristin.id), by = join_by(key))
+      dplyr::left_join(extras$extras, by = "key", suffix = c("", ".remove")) |>
+      dplyr::select(-c(dplyr::ends_with(".remove")))
   }
 
   # Create return.list

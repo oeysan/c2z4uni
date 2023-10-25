@@ -12,6 +12,9 @@ defined by `ezproxy.host`
 
 #### Minor 
 
+* SDG's, bibliographies, monthlies and extras should all now use key and version
+to update `rds` files in `local.storage`.
+
 * Separated `CristinMonthly` into a main function an two internal helper 
 functions: `CreateMonthlies` and `CreateExtras`. `CreateMonthlies` will create
 the main monthly bibliographies and store (if `local.storage` is defined) at 

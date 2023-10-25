@@ -430,6 +430,13 @@ SdgPredictions <- \(items, sdg.script, sdg.model, sdg.host) {
   # Create tibble from predictions
   sdg <- JsonToTibble(httr.post$data)
 
+  if (any(nrow(sdg))) {
+    sdg <- sdg |>
+      dplyr::arrange(match(key, items$key)) |>
+      dplyr::left_join(dplyr::select(items, c(key, version))) |>
+      dplyr::select(key, version, dplyr::everything())
+  }
+
   return (sdg)
 
 }
@@ -694,39 +701,34 @@ CreateMonthlies <- \(zotero,
       force = TRUE
     )$results
 
-    # Check if there are new/modifed items
-    if (!is.null(items) & any(nrow(check.items))) {
-
-      new.keys <- check.items |>
-        dplyr::left_join(dplyr::select(items, c(key, version)), by = "key") |>
-        dplyr::filter(
-          version.x > version.y | is.na(version.y)
-        ) |>
-        dplyr::pull(key)
-
-
-      # Remove items not found in zotero
-      if (any(nrow(items))) {
-        items <- items |>
-          filter(key %in% check.items$key)
-      }
-      if (any(nrow(bibliography))) {
-        bibliography <- bibliography |>
-          filter(key %in% check.items$key)
-      }
-
-    } else if (any(nrow(check.items))) {
-      new.keys <- check.items$key
+    # Remove items not found in Zotero
+    if (any(nrow(items))) {
+      items <- items |>
+        filter(key %in% check.items$key)
     }
+    if (any(nrow(bibliography))) {
+      bibliography <- bibliography |>
+        filter(key %in% check.items$key)
+    }
+    # Check if there are new/modified items
+    new.keys <- check.items |>
+      dplyr::anti_join(items, by = c("key", "version")) |>
+      dplyr::pull(key) |>
+      GoFish(type = NULL)
 
     # Check if there are keys in items that are not in bibliography
     if (any(nrow(items) > nrow(bibliography))) {
       missing.keys <- items |>
-        dplyr::anti_join(bibliography, by = "key") |>
-        dplyr::pull(key)
+        dplyr::anti_join(bibliography, by = c("key", "version")) |>
+        dplyr::pull(key) |>
+        GoFish(type = NULL)
       new.keys <- unique(c(new.keys, missing.keys))
     }
 
+    # Set new keys as all keys in zotero if no items
+    if (!any(nrow(items)) & any(nrow(check.items))) {
+      new.keys <- check.items$key
+    }
     # Fetch bibliography for new items
     if (any(length(new.keys))) {
 
@@ -950,6 +952,7 @@ CreateExtras <- \(monthlies,
     extras <- items |>
       dplyr::transmute(
         key,
+        version,
         title,
         type = itemType,
         abstract = abstractNote,
@@ -1034,8 +1037,8 @@ CreateExtras <- \(monthlies,
 
     # Check if any missing items
     missing.items <- monthlies$items |>
-      dplyr::anti_join(sdg, by = "key") |>
-      GoFish()
+      dplyr::anti_join(sdg, by = c("key", "version")) |>
+      GoFish(type = NULL)
 
     # Update sdg if missing items
     if (any(nrow(missing.items))) {
@@ -1085,8 +1088,8 @@ CreateExtras <- \(monthlies,
 
     # Check if any missing items
     missing.items <- monthlies$items |>
-      dplyr::anti_join(extras, by = "key") |>
-      GoFish()
+      dplyr::anti_join(extras, by = c("key", "version")) |>
+      GoFish(type = NULL)
 
     # Update if new items
     if (any(nrow(missing.items))) {
