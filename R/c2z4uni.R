@@ -481,13 +481,16 @@ SdgInfo <- \(sdg.sum,
              range = NULL,
              lang = "no",
              sdg.path = NULL,
-             archive.url = NULL) {
+             archive.url = NULL,
+             archive.append = NULL,
+             sort = FALSE,
+             delete = FALSE) {
 
   # Languages
   # Set language to en if not nb or nn
   lang <- if (!lang %in% c("nb", "nn", "no")) "en" else "no"
 
-  SdgUrls <- \(lang = "no") {
+  SdgUrls <- \(lang = "no", sdgs) {
 
     # Find Norwegian urls
     if (lang == "no") {
@@ -505,11 +508,11 @@ SdgInfo <- \(sdg.sum,
         rvest::read_html() |>
         rvest::html_nodes(".header_gols_content_list li a") |>
         rvest::html_attr('href') |>
-        (\(x) paste0("https://www.fn.no", x)[1:17])()
+        (\(x) paste0("https://www.fn.no", x)[sdgs])()
 
     } else {
 
-      sdg.urls <- paste0("https://sdgs.un.org/goals/goal", seq_len(17))
+      sdg.urls <- paste0("https://sdgs.un.org/goals/goal", sdgs)
 
     }
 
@@ -519,18 +522,30 @@ SdgInfo <- \(sdg.sum,
 
   # List of SDGs
   sdgs <- if (is.null(range)) 1:17 else range
+  # Delete zero if delete is true
+  if (delete) {
+    sdgs <- sdgs[sdg.sum > 0]
+    sdg.sum <- sdg.sum[sdg.sum > 0]
+  }
+  # Sort if sort is true
+  if (sort) {
+    sdgs <- sdgs[order(sdg.sum, decreasing = TRUE)]
+    sdg.sum <- sdg.sum[order(sdg.sum, decreasing = TRUE)]
+  }
 
   # Urls
-  sdg.urls <- SdgUrls(lang)
+  sdg.urls <- SdgUrls(lang, sdgs)
 
   # Initialize an empty list to store the HTML code for each SDG
-  sdg.html <- list()
-
-  for (i in sdgs) {
-    sdg.id <- sprintf("sdg%d", i)
+  sdg.html <- lapply(seq_along(sdgs), \(i) {
+    x <- sdgs[[i]]
+    sdg.id <- sprintf("sdg%d", x)
     if (is.null(sdg.path)) sdg.path <- "/images/sdg"
-    sdg.archive.url <- paste0(archive.url, paste0("?sdg=", i, "#archive"))
-    sdg.image <- file.path(sdg.path, sprintf("sdg%02d_%s.png", i, lang))
+    sdg.archive.url <- paste0(
+      archive.url,
+      paste0("?sdg=", x, archive.append, "#archive")
+    )
+    sdg.image <- file.path(sdg.path, sprintf("sdg%02d_%s.png", x, lang))
     sdg.publications <- Dict("publications", lang, sdg.sum[[i]])
     sdg.span <- sprintf("%s", sdg.sum[[i]])
     sdg.url <- sprintf("%s", sdg.urls[[i]])
@@ -546,7 +561,7 @@ SdgInfo <- \(sdg.sum,
       </div>',
       sdg.id,
       sdg.image,
-      i,
+      x,
       sdg.archive.url,
       sdg.span,
       sdg.publications,
@@ -555,9 +570,9 @@ SdgInfo <- \(sdg.sum,
     )
 
     # Append the HTML code to the list
-    sdg.html[[i]] <- Trim(sdg.code)
+    Trim(sdg.code)
 
-  }
+  })
 
   return( sdg.html[lengths(sdg.html) > 0])
 

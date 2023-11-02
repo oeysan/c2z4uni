@@ -30,10 +30,17 @@
 #'     start.date = "2023-07",
 #'     post = TRUE,
 #'     silent = TRUE
-#'   )
+#'   ) |>
+#'     c2z:::GoFish()
 #'
-#'   # Create json data
-#'   example.json <- CristinJson(example, user.cards = FALSE)
+#'
+#'   if (any(nrow(example$unit.paths))) {
+#'     # Create json data
+#'     example.json <- CristinJson(example, user.cards = FALSE) |>
+#'       jsonlite::prettify() |>
+#'       c2z:::GoFish()
+#'     if (any(!is.na(example.json))) cat(example.json)
+#'   }
 #' }
 #' @rdname CristinJson
 #' @export

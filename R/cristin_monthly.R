@@ -118,6 +118,26 @@ CristinMonthly <- \(zotero,
   lang <- if (lang %in% c("no", "nn", "nb")) "no" else "en"
   post.lang <- if (post.lang %in% c("no", "nn", "nb")) "no" else "en"
 
+  # Define units
+  units <- CristinUnits(
+    unit.key,
+    recursive = unit.recursive,
+    lang = post.lang
+  )
+
+  if (!any(nrow(units))) {
+    # Log
+    log <-  LogCat(
+      "No units found.",
+      silent = silent,
+      log = log
+    )
+    return (log)
+  }
+
+  n.paths <- ncol(dplyr::select(units, dplyr::starts_with("path")))+2
+
+
   # Try to restore collections if local.storage is TRUE
   if (!is.null(local.storage)) {
 
@@ -147,14 +167,6 @@ CristinMonthly <- \(zotero,
     collections <- zotero$collections
 
   }
-
-  # Define units
-  units <- CristinUnits(
-    unit.key,
-    recursive = unit.recursive,
-    lang = post.lang
-  )
-  n.paths <- ncol(dplyr::select(units, dplyr::starts_with("path")))+2
 
   # Post monthly data to Zotero library if post is TRUE
   if (post) {
