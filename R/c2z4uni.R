@@ -942,25 +942,22 @@ CreateExtras <- \(monthlies,
     doi <- extras <- NULL
 
   # Function to fetch sdgs for items
-  FetchSdg <- \(x, sdg, sdg.cutoff) {
-
-    if (!any(nrow(sdg))) {
-      return (NULL)
-    }
-
-    sdgs <- SdgCutoff(sdg, sdg.cutoff)$cutoff |>
-      dplyr::select(c(key, dplyr::starts_with("sdg"))) |>
+  FetchSdg <- \(x, sdg.cutoffs) {
+    # Select key and sdg columns
+    dplyr::select(sdg.cutoffs, c(key, dplyr::starts_with("sdg"))) |>
+      # Filter by key (x) and where sdg > 0
       filter(key == x & dplyr::if_any(dplyr::where(is.numeric)) > 0) |>
-      dplyr::select(where(~ all(.x > 0)), -key)
-
-    if (any(nrow(sdgs))) gsub("\\D+", "", names(sdgs))
-
+      # Select all sdg > 1 and remove key
+      dplyr::select(where(~ all(.x > 0)), -key) |>
+      # Extract number from sdg (e.g., sdg14 = 14)
+      (\(x)  if(nrow(x))gsub("\\D+", "", names(x)))() |>
+      # Return NULL on error
+      GoFish(type = NULL)
   }
 
   # Function to enhance bibliography
   GetExtras <- \(items,
-                 sdg,
-                 sdg.cutoff,
+                 sdg.cutoffs,
                  get.unpaywall,
                  get.ezproxy,
                  ezproxy.host,
@@ -995,11 +992,11 @@ CreateExtras <- \(monthlies,
       )
 
     # Add SDG if sdg.model is defined
-    if (!is.null(sdg.model)) {
+    if (any(nrow(sdg.cutoffs))) {
       extras <- extras |>
         dplyr::mutate(
           sdg = purrr::map(
-            key, ~ FetchSdg(.x, sdg, sdg.cutoff),
+            key, ~ FetchSdg(.x, sdg.cutoffs),
             .progress = if (!silent) "Finding SDGs" else FALSE
           )
         )
@@ -1095,6 +1092,9 @@ CreateExtras <- \(monthlies,
     }
   }
 
+  # Define sdg.data
+  sdg.data <- SdgCutoff(sdg, sdg.cutoff)
+
   # Try to restore monthlies to local storage if defined
   if (!is.null(local.storage)) {
 
@@ -1121,8 +1121,7 @@ CreateExtras <- \(monthlies,
       # Create monthlies for new items
       new.extras <- GetExtras(
         missing.items,
-        sdg,
-        sdg.cutoff,
+        sdg.data$cutoff,
         get.unpaywall,
         get.ezproxy,
         ezproxy.host,
@@ -1141,8 +1140,7 @@ CreateExtras <- \(monthlies,
 
     extras <- GetExtras(
       monthlies$items,
-      sdg,
-      sdg.cutoff,
+      sdg.data$cutoff,
       get.unpaywall,
       get.ezproxy,
       ezproxy.host,
