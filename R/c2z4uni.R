@@ -854,7 +854,7 @@ CreateMonthlies <- \(zotero,
     )
 
     # Update if new items
-    if (any(nrow(new.zotero$results))) {
+    if (any(nrow(new.zotero$results)) & any(nrow(monthlies))) {
 
       # Create monthlies for new items
       new.monthlies <- EnhanceBib(
@@ -1055,7 +1055,7 @@ CreateExtras <- \(monthlies,
       GoFish(type = NULL)
 
     # Update sdg if missing items
-    if (any(nrow(missing.items))) {
+    if (any(nrow(missing.items)) & any(nrow(sdg))) {
       new.sdg <- SdgPredictions(
         missing.items,
         sdg.script,
@@ -1116,7 +1116,7 @@ CreateExtras <- \(monthlies,
       GoFish(type = NULL)
 
     # Update if new items
-    if (any(nrow(missing.items))) {
+    if (any(nrow(missing.items)) & any(nrow(extras))) {
 
       # Create monthlies for new items
       new.extras <- GetExtras(
