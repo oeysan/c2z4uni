@@ -1442,42 +1442,93 @@ CristinId <- \(id, error = NULL, unit = FALSE) {
 
 }
 
-#' @title InnCristin
+#' @title CristinName
 #' @keywords internal
 #' @noRd
-InnCristin <- \(name) {
+CristinName <- \(full.name, institution = 209) {
 
-  # Remove any middle names
-  name <- strsplit(name, "\\s+")[[1]] |>
-    (\(x) paste(x[c(1, length(x))], collapse = " "))()
+  # Visible bindings
+  id <- NA
 
-  # Query user url
-  httr.get <- Online(
-    httr::RETRY(
-      "GET",
-      "https://api.cristin.no/v2/persons/",
-      query = list(
-        name = name,
-        institution = 209
-      ),
-      quiet = TRUE
-    ),
-    silent = TRUE
-  )
-
-  # Return NA if not found
-  if (httr.get$error) {
+  if (any(is.na(GoFish(full.name)))) {
     return (NA)
   }
 
-  id <- GoFish(
-    httr::content(httr.get$data)[[1]]$cristin_person_id[[1]]
+  # Function to calculate Levenshtein distance and find the closest match
+  ClosestMatch <- function(query, data, cut.off = 2) {
+
+    names <- paste(data$first_name, data$surname)
+    distances <- stringdist::stringdistmatrix(query, names, method = "lv")
+    closest.index <- which.min(distances)
+    min.distance <- min(distances)
+
+    if (min.distance <= cut.off) {
+      id <- GoFish(data[closest.index, ]$cristin_person_id[[1]])
+      return(id)
+    } else {
+      return(NA)
+    }
+  }
+
+  # Define names
+  no.middlename <- strsplit(full.name, "\\s+")[[1]] |>
+    (\(x) paste(x[c(1, length(x))], collapse = " "))()
+  last.name <- tail(strsplit(no.middlename, "\\s+")[[1]], 1)
+  first.name <- head(strsplit(no.middlename, "\\s+")[[1]], 1)
+
+  # Create a list of the names
+  names <- list(
+    full.name = full.name,
+    no.middlename = no.middlename,
+    last.name = last.name,
+    first.name = first.name
   )
+
+  # Loop through the names
+  for (i in seq_len(4)) {
+
+    # Query user url
+    httr.get <- Online(
+      httr::RETRY(
+        "GET",
+        "https://api.cristin.no/v2/persons/",
+        query = list(
+          name = names[[i]],
+          institution = institution
+        ),
+        quiet = TRUE
+      ),
+      silent = TRUE
+    )
+
+
+    # Return NA if not found
+    if (httr.get$error) {
+      next
+    }
+
+    # Get Cristin data
+    data <- JsonToTibble(httr.get$data)
+
+    # Skip if no rows are found
+    if (!any(nrow(data))) {
+      next
+    }
+
+    # Check if a match is found using full name
+    id <- ClosestMatch(names$full.name, data)
+    # Break loop if id is found
+    if (any(!is.na(id))) break
+    # Check if a match is found using first and last name
+    id <- ClosestMatch(names$no.middlename, data)
+    # Break loop if id is found
+    if (any(!is.na(id))) break
+
+  }
 
   return (id)
 
 }
-
 
 #' @title GetCards
 #' @keywords internal
@@ -1708,7 +1759,7 @@ InnUsers <- \(i = 1,
     users <- users |>
       dplyr::mutate(
         cristin.id = purrr::map_chr(
-          full.name, ~ InnCristin(.x), .progress = !silent
+          full.name, ~ CristinName(.x), .progress = !silent
         )
       ) |>
       dplyr::filter(!is.na(cristin.id)) |>

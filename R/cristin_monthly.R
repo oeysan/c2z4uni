@@ -137,7 +137,6 @@ CristinMonthly <- \(zotero,
 
   n.paths <- ncol(dplyr::select(units, dplyr::starts_with("path")))+2
 
-
   # Try to restore collections if local.storage is TRUE
   if (!is.null(local.storage)) {
 
@@ -512,7 +511,13 @@ CristinMonthly <- \(zotero,
     dplyr::filter(name %in% lapply(units$core, \(x) tail(x, 1)))  |>
     dplyr::arrange(match(name, lapply(units$core, \(x) tail(x, 1)))) |>
     dplyr::transmute(
-      id = units$id,
+      id = purrr::map_chr(name, ~ {
+        x <- .x
+        units |>
+          dplyr::filter(dplyr::if_any(dplyr::starts_with("path"), ~ .x == x)) |>
+          dplyr::slice_min(order_by = id, n = 1) |>
+          dplyr::pull(id)
+      }),
       name,
       key,
       parentCollection,
@@ -547,7 +552,7 @@ CristinMonthly <- \(zotero,
       dplyr::select(id, name)
 
     unit.paths <- unit.paths |>
-      dplyr::rows_update(units, by = "id")
+      dplyr::rows_update(units, by = "id", unmatched = "ignore")
   }
 
   # Save unit paths if local storage is defined
