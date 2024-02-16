@@ -62,13 +62,11 @@ JSON format
   ) |>
     c2z:::GoFish()
 
+  # Create json data
+  example.json <- CristinJson(example, user.cards = FALSE) |>
+    jsonlite::prettify() |>
+    c2z:::GoFish()
 
-  if (any(nrow(example$unit.paths))) {
-    # Create json data
-    example.json <- CristinJson(example, user.cards = FALSE) |>
-      jsonlite::prettify() |>
-      c2z:::GoFish()
-    if (any(!is.na(example.json))) cat(example.json)
-  }
+  if (any(!is.na(example.json))) cat(example.json)
 }
 }

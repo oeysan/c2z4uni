@@ -6,7 +6,7 @@ contributors,Contributors,
 webpage,Webpage,
 publications,Publication,Publications
 archive,Archive,
-email.subject,"Registered publications in cristin (%s, %s)",
+email.subject,"Registered publications in Cristin (%s, %s)",
 email.header,"This document contains registered publications in cristin from %1$s for %2$s %3$s. The archive is located at <a href=""%4$s"">%4$s</a>. Each publication is listed with a direct link to the location in the archive with more information (e.g., abstract, contributors and PDF if available).",
 c2z,CRIStin Bot is powered by,
 inn.url,https://www.inn.no/english/find-an-employee/,
