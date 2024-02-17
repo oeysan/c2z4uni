@@ -36,6 +36,7 @@
 #' Default: 'nn'
 #' @param post Post new items to specified Zotero library, Default: FALSE
 #' @param silent c2z is noisy, tell it to be quiet, Default: FALSE
+#' @param cristin.silent keep queries to Cristin quiet Default: TRUE
 #' @param log A list for storing log elements, Default: list()
 #' @return A list with bibliography and information for defined units
 #' @details Used with `CristinUnits` to create month-to-month bibliography of
@@ -102,6 +103,7 @@ CristinMonthly <- \(zotero,
                     post.lang = "nn",
                     post = FALSE,
                     silent = FALSE,
+                    cristin.silent = TRUE,
                     log = list()) {
 
   # Visible bindings
@@ -111,7 +113,7 @@ CristinMonthly <- \(zotero,
     destination.key <- lang.month <- bib <- bib.body <- bib.web <- abstract <-
     new.keys <- examine.items <- monthlies <- version.x <-
     version.y <- log.eta <- id <- multidepartmental <-
-    duplicates <- extras <- cristin.id <- NULL
+    duplicates <- extras <- cristin.id <- items <- collections <- NULL
 
   # Languages
   # Set language to en if not no
@@ -140,7 +142,7 @@ CristinMonthly <- \(zotero,
   # Try to restore collections if local.storage is TRUE
   if (!is.null(local.storage)) {
 
-    zotero$collections <- GoFish(
+    collections <- GoFish(
       readRDS(file.path(local.storage, "collections.rds")),
       NULL
     )
@@ -148,7 +150,7 @@ CristinMonthly <- \(zotero,
   }
 
   # Search collections if collections are empty
-  if (full.update | is.null(zotero$collections)) {
+  if (full.update | is.null(collections)) {
 
     # Find collections
     zotero <- c2z::Zotero(
@@ -161,6 +163,8 @@ CristinMonthly <- \(zotero,
       force = TRUE,
       log = zotero$log
     )
+
+    collections <- zotero$collections
 
   }
 
@@ -255,13 +259,13 @@ CristinMonthly <- \(zotero,
       )
 
       # Find path to collection
-      find.path <- FindPath(zotero$collections, path.name)
+      find.path <- FindPath(collections, path.name)
 
       # Add to path list
       paths <- append(paths, list(find.path$path))
 
       # Update data
-      zotero$collections <- find.path$data
+      collections <- find.path$data
 
       # Estimate time of arrival
       log.eta <- LogCat(
@@ -290,7 +294,7 @@ CristinMonthly <- \(zotero,
       saveRDS(post.data, file.path(local.storage, "post_data.rds"))
 
       # Save collections
-      saveRDS(zotero$collections, file.path(local.storage, "collections.rds"))
+      saveRDS(collections, file.path(local.storage, "collections.rds"))
 
     }
 
@@ -323,13 +327,10 @@ CristinMonthly <- \(zotero,
     }
 
     # Run full update if full.update is TRUE or duplicate check is empty
-    if (full.update | is.null(zotero$items) & !is.null(zotero$collections)) {
-
-      # Preserve collections
-      collections <- zotero$collections
+    if (full.update | is.null(zotero$items) & !is.null(collections)) {
 
       # Find core location (i.e., where all items in units are stored)
-      core.location <- zotero$collections |>
+      core.location <- collections |>
         dplyr::filter(version > 0 & parentCollection == FALSE) |>
         dplyr::pull(key)
 
@@ -385,7 +386,7 @@ CristinMonthly <- \(zotero,
         use.identifiers = use.identifiers,
         filter = filter,
         force = FALSE,
-        silent = TRUE,
+        silent = cristin.silent,
         nvi = nvi,
         zotero = zotero
       )
@@ -412,7 +413,7 @@ CristinMonthly <- \(zotero,
           })()
 
         # Accumulate results
-        zotero$items <- dplyr::bind_rows(zotero$items, cristin$results)
+        items <- dplyr::bind_rows(items, cristin$results)
 
       } # End Cristin results
 
@@ -434,21 +435,21 @@ CristinMonthly <- \(zotero,
     zotero$log <- LogCat(
       sprintf(
         "Found %s new, or modfied, %s",
-        max(0,nrow(zotero$items)),
-        Numerus(max(0,nrow(zotero$items)), "item", prefix = FALSE)
+        max(0,nrow(items)),
+        Numerus(max(0,nrow(items)), "item", prefix = FALSE)
       ),
       silent = silent,
       log = zotero$log
     )
 
     # Find multidepartmental and duplicate items if any items
-    if (any(nrow(zotero$items))) {
+    if (any(nrow(items))) {
 
       # Examine items
       if (check.items) {
         examine.items <- ExamineItems(
-          zotero$items,
-          zotero$collections,
+          items,
+          collections,
           TRUE,
           zotero$log,
           n.paths
@@ -470,6 +471,10 @@ CristinMonthly <- \(zotero,
     # Define updated collections
     if (!is.null(zotero$collections)) {
 
+      # Update collections
+      collections <- AddMissing(collections, "prefix", NA_character_) |>
+        dplyr::rows_update(zotero$collections, by = "key", unmatched = "ignore")
+
       # Save collections if local.storage is defined
       if (!is.null(local.storage)) {
 
@@ -480,12 +485,6 @@ CristinMonthly <- \(zotero,
           log = zotero$log
         )
 
-        # Update collections
-        zotero$collections <- AddMissing(
-          zotero$collections, "prefix", NA_character_
-        ) |>
-          dplyr::rows_update(zotero$collections, by = "key")
-
         # Save items
         saveRDS(
           zotero$collections, file.path(local.storage, "collections.rds")
@@ -493,16 +492,17 @@ CristinMonthly <- \(zotero,
 
       }
 
-      # Remove collections with no items
-      zotero$collections  <- zotero$collections  |>
-        dplyr::filter(version > 0) |>
-        dplyr::distinct(key, .keep_all = TRUE)
     }
 
   } # End post
 
+  # Remove collections with no items
+  collections  <- collections  |>
+    dplyr::filter(version > 0) |>
+    dplyr::distinct(key, .keep_all = TRUE)
+
   # Return NULL if there are no collections, and thus no items
-  if (is.null(zotero$collections)) {
+  if (!any(nrow(collections))) {
     return (NULL)
   }
 
@@ -515,7 +515,7 @@ CristinMonthly <- \(zotero,
   )
 
   # Set unit paths
-  unit.paths <- zotero$collections |>
+  unit.paths <- collections |>
     dplyr::filter(name %in% lapply(units$core, \(x) tail(x, 1)))  |>
     dplyr::arrange(match(name, lapply(units$core, \(x) tail(x, 1)))) |>
     dplyr::transmute(
@@ -529,10 +529,10 @@ CristinMonthly <- \(zotero,
       name,
       key,
       parentCollection,
-      paths = purrr::map(key, ~ AncestorPath(zotero$collections, .x)),
+      paths = purrr::map(key, ~ AncestorPath(collections, .x)),
       level = purrr::map_int(paths, length),
       affiliated = purrr::map_chr(key, ~ {
-        x <- zotero$collections |>
+        x <- collections |>
           dplyr::filter(
             parentCollection == .x &
               grepl(Dict("affiliation", post.lang), name)
@@ -575,7 +575,7 @@ CristinMonthly <- \(zotero,
   monthlies <- CreateMonthlies(
     zotero,
     unit.paths,
-    zotero$collections,
+    collections,
     local.storage,
     full.update,
     lang,
@@ -616,7 +616,7 @@ CristinMonthly <- \(zotero,
 
     examine.items <- ExamineItems(
       monthlies$items,
-      zotero$collections,
+      collections,
       silent,
       extras$log,
       n.paths
