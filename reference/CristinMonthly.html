@@ -19,7 +19,7 @@ Faculties -&amp;gt; Departments -&amp;gt; Groups)."><!-- mathjax --><script src=
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9018</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9019</span>
       </span>
     </div>
 
@@ -61,9 +61,6 @@ Faculties -&gt; Departments -&gt; Groups).</p>
 <span>  <span class="va">zotero</span>,</span>
 <span>  <span class="va">unit.key</span>,</span>
 <span>  unit.recursive <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  sdg.script <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  sdg.model <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  sdg.cutoff <span class="op">=</span> <span class="fl">0.98</span>,</span>
 <span>  sdg.host <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  get.unpaywall <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  get.ezproxy <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -100,18 +97,6 @@ Faculties -&gt; Departments -&gt; Groups).</p>
 
 <dt>unit.recursive</dt>
 <dd><p>Find subunits of defined unit key, Default: TRUE</p></dd>
-
-
-<dt>sdg.script</dt>
-<dd><p>script to run SDG predictions, Default: NULL</p></dd>
-
-
-<dt>sdg.model</dt>
-<dd><p>model to use for SDG predictions, Default: NULL</p></dd>
-
-
-<dt>sdg.cutoff</dt>
-<dd><p>cut off value for SDG predictions, Default: '0.98'</p></dd>
 
 
 <dt>sdg.host</dt>
@@ -249,7 +234,7 @@ selected units</p>
 <span class="r-in"><span>    post <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
 <span class="r-in"><span>    silent <span class="op">=</span> <span class="cn">TRUE</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in c2z::Cristin(unit = units$id[[i]], created_since = start.date,     created_before = CeilingDate(ChangeDate(end.date, -1)), use.identifiers = use.identifiers,     filter = filter, force = FALSE, silent = cristin.silent,     nvi = nvi, zotero = zotero):</span> unused argument (nvi = nvi)</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in c2z::Zotero(zotero = zotero, collection.key = core.location,     search.collections = FALSE, item.type = "-attachment || note",     library = TRUE, silent = silent, force = TRUE, log = zotero$log):</span> unused argument (search.collections = FALSE)</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>  <span class="co"># Print the three first individual pages (if any)</span></span></span>
 <span class="r-in"><span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">example</span><span class="op">$</span><span class="va">monthlies</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
