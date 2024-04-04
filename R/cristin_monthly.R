@@ -5,9 +5,6 @@
 #' @param zotero What Zotero library to use
 #' @param unit.key What unit to search for
 #' @param unit.recursive Find subunits of defined unit key, Default: TRUE
-#' @param sdg.script script to run SDG predictions, Default: NULL
-#' @param sdg.model model to use for SDG predictions, Default: NULL
-#' @param sdg.cutoff cut off value for SDG predictions, Default: '0.98'
 #' @param sdg.host host conducting SDG predictions, Default: NULL
 #' @param get.unpaywall Find Unpaywall resources, Default: FALSE
 #' @param get.ezproxy Use ezproxy, Default: FALSE
@@ -81,9 +78,6 @@
 CristinMonthly <- \(zotero,
                     unit.key,
                     unit.recursive = TRUE,
-                    sdg.script = NULL,
-                    sdg.model = NULL,
-                    sdg.cutoff = 0.98,
                     sdg.host = NULL,
                     get.unpaywall = FALSE,
                     get.ezproxy = FALSE,
@@ -473,7 +467,9 @@ CristinMonthly <- \(zotero,
 
       # Update collections
       collections <- AddMissing(collections, "prefix", NA_character_) |>
-        dplyr::rows_update(zotero$collections, by = "key", unmatched = "ignore")
+        dplyr::rows_update(zotero$collections, by = "key", unmatched = "ignore") |>
+        dplyr::filter(version > 0) |>
+        dplyr::distinct(key, .keep_all = TRUE)
 
       # Save collections if local.storage is defined
       if (!is.null(local.storage)) {
@@ -486,9 +482,7 @@ CristinMonthly <- \(zotero,
         )
 
         # Save items
-        saveRDS(
-          zotero$collections, file.path(local.storage, "collections.rds")
-        )
+        saveRDS(collections, file.path(local.storage, "collections.rds"))
 
       }
 
@@ -589,9 +583,6 @@ CristinMonthly <- \(zotero,
   if (any(nrow(monthlies$items))) {
     extras <- CreateExtras(
       monthlies,
-      sdg.script,
-      sdg.model,
-      sdg.cutoff,
       sdg.host,
       get.unpaywall,
       get.ezproxy,

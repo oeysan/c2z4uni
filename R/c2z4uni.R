@@ -357,108 +357,79 @@ FindNvi <- \(data) {
 #' @title SdgPredictions
 #' @keywords internal
 #' @noRd
-SdgPredictions <- \(items, sdg.script, sdg.model, sdg.host) {
+SdgPredictions <- \(data, sdg.host) {
 
   # Visible bindings
-  cutoff <- sum <- abstractNote <- key <- process <- NULL
+  abstractNote <- key <- title <- text <- translated_text <- NULL
+
+  if (!any(nrow(data))) {
+    return (NULL)
+  }
 
   # Find abstracts
-  abstracts <- items |>
+  abstracts <- data |>
+    dplyr::filter(!is.na(abstractNote)) |>
     dplyr::transmute(
-      key = key,
-      # Remove any abstract less than 50 characters
-      abstract = purrr::map_chr(abstractNote, ~ dplyr::case_when(
-        stringr::str_count(.x, '\\w+') > 50 ~ .x,
-        TRUE ~ NA
-      ))
-    ) |>
+      key,
+      version,
+      text =  paste(title, abstractNote, sep = ". ")
+    )  |>
     tidyr::drop_na()
-
 
   if (!any(nrow(abstracts))) {
     return (NULL)
   }
 
-  # Save abstracts to temp file
-  abstracts.file <- gsub("\\\\", "/", file.path(tempdir(), "abstracts.csv"))
-  readr::write_excel_csv(abstracts, abstracts.file)
-
-  # Run Python script if sdg.host is not defined
-  if (is.null(sdg.host)) {
-
-    # Run Python script in the background
-    process <- processx::process$new(
-      "python",
-      args = c(sdg.script, "--model_dir", dirname(sdg.model)),
-      stdout =  file.path(tempdir(),"sdg_output.txt"),
-      stderr = file.path(tempdir(),"sdg_error.txt")
-    )
-
-    # Wait for a moment to ensure the Python script has started
-    Sys.sleep(5)
-
-    # Define host (should be localhost at post 6963)
-    sdg.host <- "http://localhost:6963/"
-
-  }
-
-  # Create params for model
-  params <- list(
-    model = basename(sdg.model),
-    file = httr::upload_file(abstracts.file)
+  # Define JSON
+  data <- jsonlite::toJSON(
+    abstracts, dataframe = "rows", auto_unbox = TRUE
   )
 
-  # Fetch csl
+  # Fetch SDG predictions
   httr.post <- Online(
     httr::RETRY(
       "POST",
       sdg.host,
-      body = params,
+      body = data,
+      add_headers(.headers = c('Content-Type' = 'application/json')),
       quiet = TRUE
     ),
     silent = TRUE
   )
 
-  # Terminate the Python process when done
-  if (!is.null(process)) process$kill()
-
-  # Return NA if not found
   if (httr.post$error) {
     return (NULL)
   }
+  results <- JsonToTibble(httr.post$data)
+  predictions <- results |>
+    dplyr::select(order(as.numeric(gsub("\\D", "", colnames(results))))) |>
+    dplyr::select(key, version, dplyr::everything(), -c(text, translated_text))
 
-  # Create tibble from predictions
-  sdg <- JsonToTibble(httr.post$data)
-
-  if (any(nrow(sdg))) {
-    sdg <- sdg |>
-      dplyr::arrange(match(key, items$key)) |>
-      dplyr::left_join(dplyr::select(items, c(key, version)), by = "key") |>
-      dplyr::select(key, version, dplyr::everything())
-  }
-
-  return (sdg)
+  return (predictions)
 
 }
 
-#' @title SdgCutoff
+#' @title SdgSummary
 #' @keywords internal
 #' @noRd
-SdgCutoff <- \(sdg, sdg.cutoff = 0.98) {
+SdgSummary <- \(data, column = "llm_sdgs_final") {
 
-  if (!any(nrow(sdg))) {
+  if (!any(nrow(data))) {
     return (NULL)
   }
 
-  cutoff <- sdg |>
-    dplyr::mutate(
-      dplyr::across(
-        dplyr::starts_with("sdg"), ~
-          dplyr::case_when(.x >= sdg.cutoff ~ 1, TRUE ~ 0)
-      )
+  sdg.cols = paste0("sdg", 1:17)
+  sdgs <- lapply(seq_len(nrow(data)), \(i) {
+    tibble::tibble(
+      key = data[i, ]$key,
+      version = data[i, ]$version,
+      !!!setNames(as.numeric(seq(17) %in% unlist(data[i, column])), sdg.cols)
     )
+  }) |>
+    dplyr::bind_rows()
 
-  sum <- cutoff |>
+
+  sum <- sdgs |>
     dplyr::summarise(
       dplyr::across(
         dplyr::starts_with("sdg") , ~ sum(.x, na.rm = TRUE)
@@ -467,10 +438,11 @@ SdgCutoff <- \(sdg, sdg.cutoff = 0.98) {
     unlist()
 
   return.list <- list(
-    sdg = sdg,
-    cutoff = cutoff,
+    sdgs = sdgs,
     sum = sum
   )
+
+  return (return.list)
 
 }
 
@@ -923,9 +895,6 @@ CreateMonthlies <- \(zotero,
 #' @keywords internal
 #' @noRd
 CreateExtras <- \(monthlies,
-                  sdg.script,
-                  sdg.model,
-                  sdg.cutoff,
                   sdg.host,
                   get.unpaywall,
                   get.ezproxy,
@@ -939,25 +908,11 @@ CreateExtras <- \(monthlies,
   # Visible bindings
   sdg <- new.items <- missing.items <- where <- key <- title <- itemType <-
     abstractNote <- extra <- cristin.id <- prefix <- ISBN <- DOI <-
-    doi <- extras <- NULL
-
-  # Function to fetch sdgs for items
-  FetchSdg <- \(x, sdg.cutoffs) {
-    # Select key and sdg columns
-    dplyr::select(sdg.cutoffs, c(key, dplyr::starts_with("sdg"))) |>
-      # Filter by key (x) and where sdg > 0
-      filter(key == x & dplyr::if_any(dplyr::where(is.numeric)) > 0) |>
-      # Select all sdg > 1 and remove key
-      dplyr::select(where(~ all(.x > 0)), -key) |>
-      # Extract number from sdg (e.g., sdg14 = 14)
-      (\(x)  if(nrow(x))gsub("\\D+", "", names(x)))() |>
-      # Return NULL on error
-      GoFish(type = NULL)
-  }
+    doi <- extras <- llm_sdgs_final <- NULL
 
   # Function to enhance bibliography
   GetExtras <- \(items,
-                 sdg.cutoffs,
+                 sdgs,
                  get.unpaywall,
                  get.ezproxy,
                  ezproxy.host,
@@ -992,14 +947,12 @@ CreateExtras <- \(monthlies,
       )
 
     # Add SDG if sdg.model is defined
-    if (any(nrow(sdg.cutoffs))) {
-      extras <- extras |>
-        dplyr::mutate(
-          sdg = purrr::map(
-            key, ~ FetchSdg(.x, sdg.cutoffs),
-            .progress = if (!silent) "Finding SDGs" else FALSE
-          )
-        )
+    if (any(nrow(sdgs))) {
+
+      sdgs <- sdgs |>
+        dplyr::select(key, sdg = llm_sdgs_final)
+      extras <- dplyr::left_join(extras, sdgs, by = "key")
+
     }
 
     # Add unpaywall if get.unpaywall is TRUE
@@ -1034,7 +987,7 @@ CreateExtras <- \(monthlies,
   }
 
   # Try to restore sdgs to local storage if defined
-  if (!is.null(local.storage) & !is.null(sdg.model)) {
+  if (!is.null(local.storage)) {
 
     # Log SDG predictions
     log <-  LogCat(
@@ -1056,12 +1009,7 @@ CreateExtras <- \(monthlies,
 
     # Update sdg if missing items
     if (any(nrow(missing.items)) & any(nrow(sdg))) {
-      new.sdg <- SdgPredictions(
-        missing.items,
-        sdg.script,
-        sdg.model,
-        sdg.host
-      )
+      new.sdg <- SdgPredictions(missing.items, sdg.host)
 
       # Update or insert sdg
       if (any(nrow(new.sdg))) {
@@ -1071,12 +1019,12 @@ CreateExtras <- \(monthlies,
   }
 
   # Run full sdg predictions if full update or sdg are empty
-  if ((full.update | !any(nrow(sdg))) & !is.null(sdg.model)) {
-    sdg <- SdgPredictions(monthlies$items, sdg.script, sdg.model, sdg.host)
+  if ((full.update | !any(nrow(sdg))) & !is.null(sdg.host)) {
+    sdg <- SdgPredictions(monthlies$items, sdg.host)
   }
 
   # Save data to local storage if defined
-  if (!is.null(local.storage) & !is.null(sdg.model)) {
+  if (!is.null(local.storage) & !is.null(sdg.host)) {
 
     if (any(nrow(sdg))) {
       # Log
@@ -1091,9 +1039,6 @@ CreateExtras <- \(monthlies,
       )
     }
   }
-
-  # Define sdg.data
-  sdg.data <- SdgCutoff(sdg, sdg.cutoff)
 
   # Try to restore monthlies to local storage if defined
   if (!is.null(local.storage)) {
@@ -1121,7 +1066,7 @@ CreateExtras <- \(monthlies,
       # Create monthlies for new items
       new.extras <- GetExtras(
         missing.items,
-        sdg.data$cutoff,
+        sdg,
         get.unpaywall,
         get.ezproxy,
         ezproxy.host,
@@ -1140,7 +1085,7 @@ CreateExtras <- \(monthlies,
 
     extras <- GetExtras(
       monthlies$items,
-      sdg.data$cutoff,
+      sdg,
       get.unpaywall,
       get.ezproxy,
       ezproxy.host,
@@ -1554,7 +1499,7 @@ GetCards <- \(local.storage, full.update, lang, silent) {
     )
 
     # Update card
-    inn.cards <- InnUsers(silent = FALSE, lang = lang)
+    inn.cards <- InnUsers(silent = silent, lang = lang)
 
     # Save inn cards to local storage if defined
     if (!is.null(local.storage)) {
@@ -1571,7 +1516,6 @@ GetCards <- \(local.storage, full.update, lang, silent) {
       )
     }
   }
-
 
   return (inn.cards)
 
@@ -2690,13 +2634,9 @@ AddMissing <- \(data,
 #' @title Trim
 #' @keywords internal
 #' @noRd
-Trim <- \(x, multi = TRUE) {
-
-  if (multi) {
-    x <- gsub("(?<=[\\s])\\s*|^\\s+|\\s+$", "", x, perl = TRUE)
-  } else {
-    x <- gsub("^\\s+|\\s+$", "", x)
-  }
+Trim <- function(x, multi = TRUE) {
+  if (multi) x <- gsub("\\s+", " ", x)
+  x <- gsub("^\\s+|\\s+$", "", x)
 
   return(x)
 

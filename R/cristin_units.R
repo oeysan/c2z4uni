@@ -130,7 +130,8 @@ CristinUnits <- \(unit.key,
         dplyr::starts_with("path"),
         ~ data.frame(!is.na(.x), !.x %in% affiliation, .x)
       )
-    )
+    ) |>
+    dplyr::distinct()
 
   return(units)
 

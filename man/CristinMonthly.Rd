@@ -8,9 +8,6 @@ CristinMonthly(
   zotero,
   unit.key,
   unit.recursive = TRUE,
-  sdg.script = NULL,
-  sdg.model = NULL,
-  sdg.cutoff = 0.98,
   sdg.host = NULL,
   get.unpaywall = FALSE,
   get.ezproxy = FALSE,
@@ -40,12 +37,6 @@ CristinMonthly(
 \item{unit.key}{What unit to search for}
 
 \item{unit.recursive}{Find subunits of defined unit key, Default: TRUE}
-
-\item{sdg.script}{script to run SDG predictions, Default: NULL}
-
-\item{sdg.model}{model to use for SDG predictions, Default: NULL}
-
-\item{sdg.cutoff}{cut off value for SDG predictions, Default: '0.98'}
 
 \item{sdg.host}{host conducting SDG predictions, Default: NULL}
 
