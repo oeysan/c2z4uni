@@ -6,6 +6,8 @@
 #' @param unit.key What unit to search for
 #' @param unit.recursive Find subunits of defined unit key, Default: TRUE
 #' @param sdg.host host conducting SDG predictions, Default: NULL
+#' @param sdg.batch The batch size for each API call to the SDG host, specifying
+#'  the number of items to be processed per request., Default: 20
 #' @param get.unpaywall Find Unpaywall resources, Default: FALSE
 #' @param get.ezproxy Use ezproxy, Default: FALSE
 #' @param ezproxy.host ezproxy host, Default: 'inn.no'
@@ -79,6 +81,7 @@ CristinMonthly <- \(zotero,
                     unit.key,
                     unit.recursive = TRUE,
                     sdg.host = NULL,
+                    sdg.batch = 20,
                     get.unpaywall = FALSE,
                     get.ezproxy = FALSE,
                     ezproxy.host = "inn.no",
@@ -584,6 +587,7 @@ CristinMonthly <- \(zotero,
     extras <- CreateExtras(
       monthlies,
       sdg.host,
+      sdg.batch,
       get.unpaywall,
       get.ezproxy,
       ezproxy.host,

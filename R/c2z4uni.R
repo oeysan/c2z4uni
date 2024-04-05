@@ -357,10 +357,10 @@ FindNvi <- \(data) {
 #' @title SdgPredictions
 #' @keywords internal
 #' @noRd
-SdgPredictions <- \(data, sdg.host) {
+SdgPredictions <- \(data, sdg.host, sdg.batch, silent = FALSE) {
 
   # Visible bindings
-  abstractNote <- key <- title <- text <- translated_text <- NULL
+  predictions <- abstractNote <- key <- title <- text <- translated_text <- NULL
 
   if (!any(nrow(data))) {
     return (NULL)
@@ -380,30 +380,58 @@ SdgPredictions <- \(data, sdg.host) {
     return (NULL)
   }
 
-  # Define JSON
-  data <- jsonlite::toJSON(
-    abstracts, dataframe = "rows", auto_unbox = TRUE
-  )
+  SdgApi <- \(items) {
 
-  # Fetch SDG predictions
-  httr.post <- Online(
-    httr::RETRY(
-      "POST",
-      sdg.host,
-      body = data,
-      add_headers(.headers = c('Content-Type' = 'application/json')),
-      quiet = TRUE
-    ),
-    silent = TRUE
-  )
+    # Define JSON
+    data <- jsonlite::toJSON(
+      items, dataframe = "rows", auto_unbox = TRUE
+    )
 
-  if (httr.post$error) {
-    return (NULL)
+    # Fetch SDG predictions
+    httr.post <- Online(
+      httr::RETRY(
+        "POST",
+        sdg.host,
+        body = data,
+        add_headers(.headers = c('Content-Type' = 'application/json')),
+        quiet = TRUE
+      ),
+      silent = TRUE
+    )
+
+    if (httr.post$error) {
+      return (NULL)
+    }
+    results <- JsonToTibble(httr.post$data)
+    predictions <- results |>
+      dplyr::select(order(as.numeric(gsub("\\D", "", colnames(results))))) |>
+      dplyr::select(key, version, dplyr::everything(), -c(text, translated_text))
+
+    return (predictions)
+
   }
-  results <- JsonToTibble(httr.post$data)
-  predictions <- results |>
-    dplyr::select(order(as.numeric(gsub("\\D", "", colnames(results))))) |>
-    dplyr::select(key, version, dplyr::everything(), -c(text, translated_text))
+
+  sdg.batches <- SplitData(abstracts, sdg.batch)
+
+  # Start time for query
+  query.start <- Sys.time()
+
+  for (i in seq_along(sdg.batches)) {
+
+    # Wrangle data
+    predictions <- dplyr::bind_rows(predictions, SdgApi(sdg.batches[[i]]))
+
+    # Estimate time of arrival
+    log.eta <- LogCat(
+      Eta(query.start, i, length(sdg.batches)),
+      silent = silent,
+      flush = TRUE,
+      log = list(),
+      append.log = FALSE
+    )
+
+  } # End for loop
+
 
   return (predictions)
 
@@ -896,6 +924,7 @@ CreateMonthlies <- \(zotero,
 #' @noRd
 CreateExtras <- \(monthlies,
                   sdg.host,
+                  sdg.batch,
                   get.unpaywall,
                   get.ezproxy,
                   ezproxy.host,
@@ -1009,7 +1038,7 @@ CreateExtras <- \(monthlies,
 
     # Update sdg if missing items
     if (any(nrow(missing.items)) & any(nrow(sdg))) {
-      new.sdg <- SdgPredictions(missing.items, sdg.host)
+      new.sdg <- SdgPredictions(missing.items, sdg.host, sdg.batch, silent)
 
       # Update or insert sdg
       if (any(nrow(new.sdg))) {
@@ -1020,7 +1049,7 @@ CreateExtras <- \(monthlies,
 
   # Run full sdg predictions if full update or sdg are empty
   if ((full.update | !any(nrow(sdg))) & !is.null(sdg.host)) {
-    sdg <- SdgPredictions(monthlies$items, sdg.host)
+    sdg <- SdgPredictions(monthlies$items, sdg.host, sdg.batch, silent)
   }
 
   # Save data to local storage if defined

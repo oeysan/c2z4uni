@@ -9,6 +9,7 @@ CristinMonthly(
   unit.key,
   unit.recursive = TRUE,
   sdg.host = NULL,
+  sdg.batch = 20,
   get.unpaywall = FALSE,
   get.ezproxy = FALSE,
   ezproxy.host = "inn.no",
@@ -39,6 +40,9 @@ CristinMonthly(
 \item{unit.recursive}{Find subunits of defined unit key, Default: TRUE}
 
 \item{sdg.host}{host conducting SDG predictions, Default: NULL}
+
+\item{sdg.batch}{The batch size for each API call to the SDG host, specifying
+the number of items to be processed per request., Default: 20}
 
 \item{get.unpaywall}{Find Unpaywall resources, Default: FALSE}
 
