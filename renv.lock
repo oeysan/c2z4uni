@@ -65,14 +65,15 @@
     },
     "c2z": {
       "Package": "c2z",
-      "Version": "0.2.0.9018",
+      "Version": "0.2.0.9019",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
-      "RemoteUsername": "oeysan",
       "RemoteRepo": "c2z",
-      "RemoteRef": "main",
-      "RemoteSha": "773a9cf45787d4dfa55b86937785f6f9804ec7b6",
+      "RemoteUsername": "oeysan",
+      "RemotePkgRef": "oeysan/c2z",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "eca24c160a7b0ac59f54b3ef3be835dec60a080b",
       "Requirements": [
         "R",
         "dplyr",
@@ -89,7 +90,7 @@
         "utils",
         "xml2"
       ],
-      "Hash": "890760b28713faa55e835bde5eff9ed1"
+      "Hash": "922febc2a32863772961504adb9ad775"
     },
     "cli": {
       "Package": "cli",
