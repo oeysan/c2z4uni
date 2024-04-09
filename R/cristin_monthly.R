@@ -471,7 +471,6 @@ CristinMonthly <- \(zotero,
       # Update collections
       collections <- AddMissing(collections, "prefix", NA_character_) |>
         dplyr::rows_update(zotero$collections, by = "key", unmatched = "ignore") |>
-        dplyr::filter(version > 0) |>
         dplyr::distinct(key, .keep_all = TRUE)
 
       # Save collections if local.storage is defined
