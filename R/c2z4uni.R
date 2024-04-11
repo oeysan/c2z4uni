@@ -115,6 +115,56 @@ GetDoi <- \(doi, extra) {
   return (doi)
 }
 
+#' @title OpenAlex
+#' @keywords internal
+#' @noRd
+OpenAlex <- \(doi) {
+
+  if (any(is.na(GoFish(doi)))) {
+    return (NA)
+  }
+
+  if (!grepl("http", doi)) {
+    doi <- paste0("https://doi.org/", doi)
+  }
+
+  url <- paste0("https://api.openalex.org/works/", doi)
+
+  # Query OpenAlex
+  httr.get <- Online(
+    httr::RETRY(
+      "GET",
+      url = url,
+      quiet = TRUE
+    ),
+    silent = TRUE
+  )
+
+  # Return NA if not found
+  if (httr.get$error) {
+    return (NA)
+  }
+
+  # Create list from JSON
+  openalex <- httr::content(httr.get$data)
+
+  # Try to get location of pdf
+  open.access <- GoFish(openalex$open_access$oa_url)
+
+  # if open.access is not defined try URL
+  if (any(is.na(open.access))) {
+    open.access <- GoFish(openalex$primary_location$pdf_url)
+  }
+
+  # if open.access is not defined try landing site
+  if (any(is.na(open.access))) {
+    open.access <- GoFish(openalex$primary_location$landing_page_url)
+  }
+
+  return (open.access)
+
+}
+
 #' @title Unpaywall
 #' @keywords internal
 #' @noRd
@@ -990,7 +1040,7 @@ CreateExtras <- \(monthlies,
       extras <- extras |>
         dplyr::mutate(
           unpaywall =  purrr::map_chr(
-            doi, ~ Unpaywall(.x),
+            doi, ~ OpenAlex(.x),
             .progress = if (!silent) "Searching Unpaywall" else FALSE
           )
         )
