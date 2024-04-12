@@ -334,6 +334,81 @@ Dict <- \(x = NULL,
 
 }
 
+#' @title UnlinkItems
+#' @keywords internal
+#' @noRd
+UnlinkItems <- \(remove.keys,
+                 local.storage,
+                 items = FALSE,
+                 bibliography = FALSE,
+                 monthlies = FALSE,
+                 extras = FALSE) {
+
+  if (items) bibliography <- TRUE
+  if (items || bibliography) monthlies <- TRUE
+  if (monthlies) extras <- TRUE
+
+
+  if (items) {
+    items.path <- file.path(local.storage, "items.rds")
+    items <- c2z4uni:::GoFish(readRDS(items.path))
+    if (any(nrow(items))) {
+      items <- dplyr::filter(items, !key %in% remove.keys)
+      saveRDS(items, items.path)
+    }
+  }
+
+  if (bibliography) {
+    bib.no.path <- file.path(local.storage, "bibliography_no.rds")
+    bib.en.path <- file.path(local.storage, "bibliography_en.rds")
+    bibliography <- c2z4uni:::GoFish(readRDS(bib.no.path))
+    if (any(nrow(bibliography))) {
+      bibliography <- dplyr::filter(bibliography, !key %in% remove.keys)
+      saveRDS(bibliography, bib.no.path)
+    }
+    bibliography <- c2z4uni:::GoFish(readRDS(bib.en.path))
+    if (any(nrow(bibliography))) {
+      bibliography <- dplyr::filter(bibliography, !key %in% remove.keys)
+      saveRDS(bibliography, bib.en.path)
+    }
+  }
+
+  if (monthlies) {
+    monthlies.no.path <- file.path(local.storage, "monthlies_no.rds")
+    monthlies.en.path <- file.path(local.storage, "monthlies_en.rds")
+    monthlies <- c2z4uni:::GoFish(readRDS(monthlies.no.path))
+    if (any(nrow(monthlies))) {
+      monthlies <- dplyr::filter(monthlies, !key %in% remove.keys)
+      saveRDS(monthlies, monthlies.no.path)
+    }
+    monthlies <- c2z4uni:::GoFish(readRDS(monthlies.en.path))
+    if (any(nrow(monthlies))) {
+      monthlies <- dplyr::filter(monthlies, !key %in% remove.keys)
+      saveRDS(monthlies, monthlies.en.path)
+    }
+  }
+
+  if (extras) {
+    extras.path <- file.path(local.storage, "monthlies_extras.rds")
+    extras <- c2z4uni:::GoFish(readRDS(extras.path))
+    if (any(nrow(extras))) {
+      extras <- dplyr::filter(extras, !key %in% remove.keys)
+      saveRDS(extras, extras.path)
+    }
+
+    sdg.predictions.path <- file.path(local.storage, "sdg_predictions.rds")
+    sdg.predictions <- c2z4uni:::GoFish(readRDS(sdg.predictions.path))
+    if (any(nrow(sdg.predictions))) {
+      sdg.predictions <- dplyr::filter(sdg.predictions, !key %in% remove.keys)
+      saveRDS(sdg.predictions, sdg.predictions.path)
+      saveRDS(
+        c2z4uni:::SdgSummary(sdg.predictions),
+        file.path(local.storage, "sdg_predictions_summary.rds")
+      )
+    }
+  }
+}
+
 #' @title Numerus
 #' @keywords internal
 #' @noRd
@@ -2509,6 +2584,154 @@ Pad <- \(string, sep = "-", max.width = 80) {
   padded <- paste0(head.char, string, tail.char)
 
   return (padded)
+
+}
+
+#' @title Length
+#' @keywords internal
+#' @noRd
+Length <- \(data, by.row = TRUE) {
+
+  # Visible bindings
+  k <- n <- 0
+
+  if (is.data.frame(data)) {
+    n <- if (by.row) nrow(data) else ncol(data)
+  } else if (is.list(data)) {
+    k <- length(data)
+    if (is.data.frame(data[[1]])) {
+      all.data <- bind_rows(data)
+      n <- if (by.row) nrow(all.data) else ncol(all.data)
+    } else {
+      n <- length(unlist(data))
+    }
+  } else {
+    n <- length(data)
+  }
+
+  return.list <- list(n = n, k = k)
+
+  return (return.list)
+
+}
+
+#' @title GetEta
+#' @keywords internal
+#' @noRd
+GetEta <- \(data,
+            func,
+            by.row = TRUE,
+            message = NULL,
+            message.col = NULL,
+            sep = "\u2014",
+            max.width = 80,
+            silent = FALSE,
+            log = list()) {
+
+  # Visible bindings
+  results <- NULL
+
+  lengths <- Length(data)
+  total <- lengths$n
+  n.message <- Numerus(total, "item")
+  if (lengths$k > 0){
+    total <- lengths$k
+    n.message <- sprintf(
+      "%s using %s",
+      n.message,
+      Numerus(total, "iteration")
+    )
+  }
+
+  query.start <- Sys.time()
+  start.message <- sprintf(
+    "Process on %s started %s",
+    n.message,
+    format(query.start, "%d.%m.%Y - %H:%M:%S")
+  )
+
+  # Start eta
+  log <- LogCat(start.message, silent = silent, log = log)
+
+  if (is.data.frame(data)) {
+
+    if (by.row) {
+
+      for (i in seq_len(total)) {
+
+        results <- dplyr::bind_rows(results, func(data[i, ]))
+
+        if (!is.null(message.col)) {
+          eta.message <- paste0(
+            message, " ", as.character(data[i, message.col])
+          )
+        } else {
+          eta.message <- message
+        }
+
+        # Estimate time of arrival
+        log.eta <-
+          LogCat(
+            Eta(query.start, i, total, eta.message),
+            silent = silent,
+            flush = TRUE,
+            log = log,
+            append.log = FALSE
+          )
+      }
+
+    } else {
+
+      for (i in seq_len(total)) {
+
+        results <- dplyr::bind_cols(results, func(data[, i]))
+
+        # Estimate time of arrival
+        log.eta <-
+          LogCat(
+            Eta(query.start, i, total),
+            silent = silent,
+            flush = TRUE,
+            log = log,
+            append.log = FALSE
+          )
+      }
+    }
+
+  } else {
+
+    for (i in seq_len(total)) {
+
+      results <- c(results, func(data[[i]]))
+
+      # Estimate time of arrival
+      log.eta <-
+        LogCat(
+          Eta(query.start, i, total),
+          silent = silent,
+          flush = TRUE,
+          log = log,
+          append.log = FALSE
+        )
+    }
+
+  }
+
+  query.end <- Sys.time()
+  end.message <- sprintf(
+    "Process ended %s",
+    format(query.end, "%d.%m.%Y - %H:%M:%S")
+  )
+
+  # End ETA
+  log <- LogCat(end.message, silent = silent, log = log.eta)
+
+  return.list <- list(
+    results = results,
+    log = log
+  )
+
+  return (return.list)
 
 }
 
