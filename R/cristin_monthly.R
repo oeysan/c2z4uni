@@ -34,6 +34,7 @@
 #' @param post.lang Define language for Zotero collections (nn, nb, en),
 #' Default: 'nn'
 #' @param post Post new items to specified Zotero library, Default: FALSE
+#' @param post.only Post new items and nothing more, Default: FALSE
 #' @param silent c2z is noisy, tell it to be quiet, Default: FALSE
 #' @param cristin.silent keep queries to Cristin quiet Default: TRUE
 #' @param log A list for storing log elements, Default: list()
@@ -99,6 +100,7 @@ CristinMonthly <- \(zotero,
                     lang = "nn",
                     post.lang = "nn",
                     post = FALSE,
+                    post.only = FALSE,
                     silent = FALSE,
                     cristin.silent = TRUE,
                     log = list()) {
@@ -470,7 +472,11 @@ CristinMonthly <- \(zotero,
 
       # Update collections
       collections <- AddMissing(collections, "prefix", NA_character_) |>
-        dplyr::rows_update(zotero$collections, by = "key", unmatched = "ignore") |>
+        dplyr::rows_update(
+          zotero$collections,
+          by = "key",
+          unmatched = "ignore"
+        ) |>
         dplyr::distinct(key, .keep_all = TRUE)
 
       # Save collections if local.storage is defined
@@ -489,6 +495,15 @@ CristinMonthly <- \(zotero,
       }
 
     }
+
+    # Update Zotero list
+    zotero$items <- items
+    zotero$collections <- collections |>
+      dplyr::filter(version > 0) |>
+      dplyr::distinct(key, .keep_all = TRUE)
+
+    # Return Zotero list if post.only is TRUE
+    if (post.only) return (zotero)
 
   } # End post
 

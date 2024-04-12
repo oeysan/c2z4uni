@@ -348,6 +348,12 @@ UnlinkItems <- \(remove.keys,
   if (items || bibliography) monthlies <- TRUE
   if (monthlies) extras <- TRUE
 
+  if (!items) {
+    updated.keys.path <- file.path(local.storage, "updated_keys.rds")
+    updated.keys <- c2z4uni:::GoFish(readRDS(updated.keys.path))
+    new.keys <- unique(c(updated.keys, remove.keys))
+    saveRDS(new.keys, updated.keys.path)
+  }
 
   if (items) {
     items.path <- file.path(local.storage, "items.rds")

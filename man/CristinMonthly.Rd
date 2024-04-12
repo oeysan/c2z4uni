@@ -27,6 +27,7 @@ CristinMonthly(
   lang = "nn",
   post.lang = "nn",
   post = FALSE,
+  post.only = FALSE,
   silent = FALSE,
   cristin.silent = TRUE,
   log = list()
@@ -86,6 +87,8 @@ Default: FALSE}
 Default: 'nn'}
 
 \item{post}{Post new items to specified Zotero library, Default: FALSE}
+
+\item{post.only}{Post new items and nothing more, Default: FALSE}
 
 \item{silent}{c2z is noisy, tell it to be quiet, Default: FALSE}
 
