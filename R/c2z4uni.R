@@ -856,6 +856,7 @@ CreateMonthlies <- \(zotero,
       bibliography <- bibliography |>
         filter(key %in% check.items$key)
     }
+
     # Check if there are new/modified items
     new.keys <- check.items |>
       dplyr::anti_join(items, by = c("key", "version")) |>
@@ -863,7 +864,7 @@ CreateMonthlies <- \(zotero,
       GoFish(type = NULL)
 
     # Check if there are keys in items that are not in bibliography
-    if (any(nrow(items) > nrow(bibliography))) {
+    if (any(nrow(items)) & any(nrow(bibliography))) {
       missing.keys <- items |>
         dplyr::anti_join(bibliography, by = c("key", "version")) |>
         dplyr::pull(key) |>
@@ -984,13 +985,23 @@ CreateMonthlies <- \(zotero,
       NULL
     )
 
-    # Update if new items
-    if (any(nrow(new.zotero$results)) & any(nrow(monthlies))) {
+    missing.items <- items |>
+      dplyr::anti_join(monthlies[-1,], by = c("key", "version")) |>
+      GoFish(type = NULL)
+
+    missing.bibliography <- bibliography |>
+      dplyr::inner_join(missing.items, by = c("key", "version")) |>
+      GoFish(type = NULL)
+
+    new.keys <- unique(c(new.keys, missing.items$key))
+
+    # Update if missing items
+    if (any(nrow(missing.items))) {
 
       # Create monthlies for new items
       new.monthlies <- EnhanceBib(
-        new.zotero$results,
-        new.zotero$bibliography,
+        missing.items,
+        missing.bibliography,
         collections,
         unit.paths,
         silent
