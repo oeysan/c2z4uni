@@ -111,7 +111,7 @@ CristinMonthly <- \(zotero,
     year.key <- desc <- core <- month.key <- title <- short.title <-
     destination.key <- lang.month <- bib <- bib.body <- bib.web <- abstract <-
     new.keys <- examine.items <- monthlies <- version.x <-
-    version.y <- log.eta <- id <- multidepartmental <-
+    version.y <- log.eta <- id <- multidepartmental <- llm_sdgs_final <-
     duplicates <- extras <- cristin.id <- items <- collections <- NULL
 
   # Languages
@@ -600,8 +600,6 @@ CristinMonthly <- \(zotero,
   if (any(nrow(monthlies$items))) {
     extras <- CreateExtras(
       monthlies,
-      sdg.host,
-      sdg.batch,
       get.unpaywall,
       get.ezproxy,
       ezproxy.host,
@@ -613,21 +611,35 @@ CristinMonthly <- \(zotero,
     )
   }
 
+  # Create SDGs if any monthlies
+  if (any(nrow(monthlies$items))) {
+    sdg <- CreateSdgs(
+      monthlies,
+      sdg.host,
+      sdg.batch,
+      local.storage,
+      full.update,
+      lang,
+      silent,
+      log = extras$log
+    )
+  }
+
   # Find multidepartmental and duplicate items
   if (check.items & any(nrow(monthlies$items))) {
 
     # Log examine items
-    extras$log <-  LogCat(
+    sdg$log <-  LogCat(
       "Searching for duplicates and multidepartmental publications",
       silent = silent,
-      log = extras$log
+      log = sdg$log
     )
 
     examine.items <- ExamineItems(
       monthlies$items,
       collections,
       silent,
-      extras$log,
+      sdg$log,
       n.paths
     )
     multidepartmental <- examine.items$multidepartmental
@@ -641,11 +653,26 @@ CristinMonthly <- \(zotero,
       dplyr::select(-c(dplyr::ends_with(".remove")))
   }
 
+  # Add SDG if sdg.model is defined
+  if (any(nrow(monthlies$monthlies)) & any(nrow(sdg$sdg))) {
+
+    monthlies$monthlies <- dplyr::left_join(
+      monthlies$monthlies,
+      sdg$sdg |>
+        dplyr::transmute(
+          key,
+          sdg = purrr::map(llm_sdgs_final, ~ as.character(.x))
+        ), by = "key"
+    )
+
+  }
+
+
   # Create return.list
   return.list <- list(
     unit.paths = unit.paths,
     monthlies =  monthlies$monthlies,
-    sdg = extras$sdg,
+    sdg = sdg$sdg,
     updated.keys = monthlies$updated.keys,
     multidepartmental = multidepartmental,
     duplicates = duplicates,

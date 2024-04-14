@@ -123,7 +123,7 @@ CristinJson <- \(cristin.monthly,
       year,
       month,
       collections,
-      sdg = purrr::map(sdg, ~ as.character(.x)),
+      sdg,
       unpaywall = GoFish(unpaywall),
       ezproxy = GoFish(ezproxy)
     )
