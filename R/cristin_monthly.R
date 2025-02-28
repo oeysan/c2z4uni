@@ -113,6 +113,7 @@ CristinMonthly <- \(zotero,
     duplicates <- extras <- cristin.id <- items <- collections <- NULL
 
   # Languages
+  sdg.lang <- if (lang %in% c("no")) "nn" else lang
   # Set language to en if not no
   lang <- if (lang %in% c("no", "nn", "nb")) "no" else "en"
   post.lang <- if (post.lang %in% c("no", "nn", "nb")) "no" else "en"
@@ -593,6 +594,7 @@ CristinMonthly <- \(zotero,
       local.storage,
       full.update,
       lang,
+      sdg.lang,
       silent,
       log = monthlies$log
     )

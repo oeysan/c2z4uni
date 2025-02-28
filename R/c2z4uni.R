@@ -53,6 +53,112 @@ zotero.types <- c2z::zotero.types
 ###############################Internal Functions###############################
 ################################################################################
 
+#' @title EtALSimple
+#' @keywords internal
+#' @noRd
+EtALSimple <- function(data) {
+  # Filter to keep only rows where creatorType is "author"
+  data <- dplyr::filter(data, creatorType == "author")
+
+  # Return NA if there are no authors
+  if (nrow(data) == 0) return(NA_character_)
+
+  # Use lastName if available, otherwise use name
+  author.names <- if ("lastName" %in% names(data)) {
+    data$lastName
+  } else {
+    data$name
+  }
+
+  n.authors <- length(author.names)
+
+  if (n.authors == 1) {
+    author.names[1]
+  } else if (n.authors == 2) {
+    stringr::str_c(author.names[1], " & ", author.names[2])
+  } else {
+    stringr::str_c(author.names[1], " et al.")
+  }
+}
+
+
+#' @title CreatorName
+#' @keywords internal
+#' @noRd
+# Function to find and format (last-) name
+CreatorName <- \(data, i, initials = FALSE, full.initials = FALSE) {
+
+  # initial return
+  name <- NA_character_
+
+  # Run if creators list is not empty
+  if (any(lengths(data))) {
+
+    # Check if creator has first name
+    name <- GoFish(data[i, ]$lastName)
+    # Else do a Cher
+    if (is.na(name)) name <- GoFish(data[i, ]$name)
+    # Add initials if initials = TRUE and exists
+    if (initials & !is.na(GoFish(data[i, ]$firstName))) {
+      # Split first.name by space and keep first letter of each part
+      initials <- strsplit(data[i, ]$firstName, " ")[[1]] |>
+        substr(1, 1)
+      # If full.initials is set to FALSE keep only first initial
+      if (!full.initials) initials <- initials[[1]]
+      # Append initials to name
+      name <- sprintf("%s. %s", paste(initials, collapse = ". "), name)
+    }
+
+  }
+
+  return (name)
+
+}
+
+
+
+#' @title EtAl
+#' @keywords internal
+#' @noRd
+EtAl <- \(data, initials = FALSE, full.initials = TRUE) {
+
+  # initial return
+  creators <- NA_character_
+
+  # Run if creators list is not empty
+  if (any(lengths(data))) {
+
+    # Filter out authors if author exist in tibble
+    data <- data |>
+      dplyr::filter(dplyr::case_when(
+        "author" %in% creatorType ~ grepl("author", creatorType),
+        TRUE ~ !grepl("contributor", creatorType)
+      ))
+
+    # Use only first authors if only one authors
+    if (nrow(data) == 1) {
+      creators <- CreatorName(data, 1, initials, full.initials)
+      # Else separate authors by & if two authors
+    } else if (nrow(data) == 2) {
+      creators <- sprintf(
+        "%s & %s",
+        CreatorName(data, 1, initials, full.initials),
+        CreatorName(data, 2, FALSE, FALSE)
+      )
+      # Else first author followed by et al if more than two authors
+    } else if (nrow(data) > 2) {
+      creators <- sprintf(
+        "%s et al.",
+        CreatorName(data, 1, initials, full.initials)
+      )
+    }
+
+  }
+
+  return (creators)
+
+}
+
 #' @title Ezproxy
 #' @keywords internal
 #' @noRd
@@ -360,11 +466,21 @@ FindNvi <- \(data) {
 SdgPredictions <- \(data, sdg.host, sdg.batch, silent = FALSE) {
 
   # Visible bindings
-  predictions <- abstractNote <- key <- title <- text <- translated_text <- NULL
+  predictions <- results <- abstractNote <- key <- title <- text <- NULL
+
 
   if (!any(nrow(data))) {
     return (NULL)
   }
+
+  missing.names <- c("title", "shortTitle", "abstractNote",
+                     "publicationTitle", "bookTitle")
+  data <- AddMissing(
+    data,
+    missing.names,
+    na.type = NA_character_,
+    location = NULL
+  )
 
   # Find abstracts
   abstracts <- data |>
@@ -372,9 +488,11 @@ SdgPredictions <- \(data, sdg.host, sdg.batch, silent = FALSE) {
     dplyr::transmute(
       key,
       version,
-      text =  paste(title, abstractNote, sep = ". ")
-    )  |>
-    tidyr::drop_na()
+      authors = purrr::map_chr(creators, EtAl),
+      title = dplyr::coalesce(title, shortTitle),
+      abstract = abstractNote,
+      source = dplyr::coalesce(publicationTitle, bookTitle)
+    )
 
   if (!any(nrow(abstracts))) {
     return (NULL)
@@ -383,8 +501,10 @@ SdgPredictions <- \(data, sdg.host, sdg.batch, silent = FALSE) {
   SdgApi <- \(items) {
 
     # Define JSON
-    data <- jsonlite::toJSON(
-      items, dataframe = "rows", auto_unbox = TRUE
+    json.data <- jsonlite::toJSON(
+      abstracts,
+      auto_unbox = TRUE,
+      na = "null"
     )
 
     # Fetch SDG predictions
@@ -392,8 +512,8 @@ SdgPredictions <- \(data, sdg.host, sdg.batch, silent = FALSE) {
       httr::RETRY(
         "POST",
         sdg.host,
-        body = data,
-        add_headers(.headers = c('Content-Type' = 'application/json')),
+        body = json.data,
+        httr::add_headers(.headers = c('Content-Type' = 'application/json')),
         quiet = TRUE
       ),
       silent = TRUE
@@ -403,11 +523,14 @@ SdgPredictions <- \(data, sdg.host, sdg.batch, silent = FALSE) {
       return (NULL)
     }
     results <- JsonToTibble(httr.post$data)
-    predictions <- results |>
-      dplyr::select(order(as.numeric(gsub("\\D", "", colnames(results))))) |>
-      dplyr::select(key, version, dplyr::everything(), -c(text, translated_text))
 
-    return (predictions)
+    if (any(nrow(results))) {
+      predictions <- results |>
+        dplyr::select(order(as.numeric(gsub("\\D", "", colnames(results))))) |>
+        dplyr::select(key, version, dplyr::everything())
+    }
+
+    return (results)
 
   }
 
@@ -431,7 +554,6 @@ SdgPredictions <- \(data, sdg.host, sdg.batch, silent = FALSE) {
     )
 
   } # End for loop
-
 
   return (predictions)
 
@@ -931,13 +1053,14 @@ CreateExtras <- \(monthlies,
                   local.storage,
                   full.update,
                   lang,
+                  sdg.lang,
                   silent,
                   log = list()) {
 
   # Visible bindings
   sdg <- new.items <- missing.items <- where <- key <- title <- itemType <-
     abstractNote <- extra <- cristin.id <- prefix <- ISBN <- DOI <-
-    doi <- extras <- llm_sdgs_final <- NULL
+    doi <- extras <- llm_sdgs_final <- col.lang <- NULL
 
   # Function to enhance bibliography
   GetExtras <- \(items,
@@ -945,6 +1068,8 @@ CreateExtras <- \(monthlies,
                  get.unpaywall,
                  get.ezproxy,
                  ezproxy.host,
+                 lang,
+                 sdg.lang,
                  silent) {
 
     extras <- items |>
@@ -977,16 +1102,23 @@ CreateExtras <- \(monthlies,
 
     # Add SDG if sdg.model is defined
     if (any(nrow(sdgs))) {
-
+      col.lang <- if (sdg.lang == "en") "" else paste0("_", sdg.lang)
       sdgs <- sdgs |>
-        dplyr::select(key, sdg = llm_sdgs_final)
+        dplyr::select(
+          key,
+          sdg = llm_sdgs_final,
+          research.field = .data[[paste0("llm_study_field", col.lang)]],
+          research.type = .data[[paste0("llm_research_type", col.lang)]],
+          research.design = .data[[paste0("llm_research_design", col.lang)]],
+          theories = .data[[paste0("llm_theories", col.lang)]],
+          synopsis = .data[[paste0("llm_synopsis", col.lang)]],
+          keywords = .data[[paste0("llm_keywords", col.lang)]]
+        )
       extras <- dplyr::left_join(extras, sdgs, by = "key")
-
     }
 
     # Add unpaywall if get.unpaywall is TRUE
     if (get.unpaywall) {
-
       extras <- extras |>
         dplyr::mutate(
           unpaywall =  purrr::map_chr(
@@ -1080,7 +1212,9 @@ CreateExtras <- \(monthlies,
     )
 
     extras <- GoFish(
-      readRDS(file.path(local.storage, "monthlies_extras.rds")),
+      readRDS(
+        file.path(local.storage, paste0("monthlies_extras_", lang, ".rds"))
+      ),
       NULL
     )
 
@@ -1099,6 +1233,8 @@ CreateExtras <- \(monthlies,
         get.unpaywall,
         get.ezproxy,
         ezproxy.host,
+        lang,
+        sdg.lang,
         silent
       )
 
@@ -1118,6 +1254,8 @@ CreateExtras <- \(monthlies,
       get.unpaywall,
       get.ezproxy,
       ezproxy.host,
+      lang,
+      sdg.lang,
       silent
     )
 
@@ -1135,7 +1273,7 @@ CreateExtras <- \(monthlies,
       )
       saveRDS(
         extras,
-        file.path(local.storage, "monthlies_extras.rds")
+        file.path(local.storage, paste0("monthlies_extras_", lang, ".rds"))
       )
     }
 

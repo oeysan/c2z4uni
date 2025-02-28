@@ -53,7 +53,7 @@ CristinJson <- \(cristin.monthly,
   # Visible bindings
   abstract <- bib.item <- key <- level <- month <- name <- parentCollection <-
     sdg <- title <- type <- year <- inn.cards <-  cristin.id <-
-    cristin.ids <- ezproxy <- unpaywall <- NULL
+    cristin.ids <- ezproxy <- unpaywall <- synopsis <- keyword <- NULL
 
   # Languages
   # Set language to en if not no
@@ -124,6 +124,8 @@ CristinJson <- \(cristin.monthly,
       month,
       collections,
       sdg,
+      synopsis,
+      keywords = Map(c, research.type, research.design, keywords),
       unpaywall = GoFish(unpaywall),
       ezproxy = GoFish(ezproxy)
     )
