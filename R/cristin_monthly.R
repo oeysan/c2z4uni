@@ -658,8 +658,6 @@ CristinMonthly <- \(zotero,
   # Add SDG if sdg.model is defined
   if (any(nrow(monthlies$monthlies)) & any(nrow(sdg$sdg))) {
 
-    print(sdg$sdg)
-
     col.lang <- if (sdg.lang == "en") "" else paste0("_", sdg.lang)
     sdgs <- sdg$sdg |>
       dplyr::select(
