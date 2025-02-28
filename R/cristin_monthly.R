@@ -34,6 +34,7 @@
 #' @param post.lang Define language for Zotero collections (nn, nb, en),
 #' Default: 'nn'
 #' @param post Post new items to specified Zotero library, Default: FALSE
+#' @param post.only Post new items and nothing more, Default: FALSE
 #' @param silent c2z is noisy, tell it to be quiet, Default: FALSE
 #' @param cristin.silent keep queries to Cristin quiet Default: TRUE
 #' @param log A list for storing log elements, Default: list()
@@ -99,6 +100,7 @@ CristinMonthly <- \(zotero,
                     lang = "nn",
                     post.lang = "nn",
                     post = FALSE,
+                    post.only = FALSE,
                     silent = FALSE,
                     cristin.silent = TRUE,
                     log = list()) {
@@ -471,7 +473,11 @@ CristinMonthly <- \(zotero,
 
       # Update collections
       collections <- AddMissing(collections, "prefix", NA_character_) |>
-        dplyr::rows_update(zotero$collections, by = "key", unmatched = "ignore") |>
+        dplyr::rows_update(
+          zotero$collections,
+          by = "key",
+          unmatched = "ignore"
+        ) |>
         dplyr::distinct(key, .keep_all = TRUE)
 
       # Save collections if local.storage is defined
@@ -490,6 +496,15 @@ CristinMonthly <- \(zotero,
       }
 
     }
+
+    # Update Zotero list
+    zotero$items <- items
+    zotero$collections <- collections |>
+      dplyr::filter(version > 0) |>
+      dplyr::distinct(key, .keep_all = TRUE)
+
+    # Return Zotero list if post.only is TRUE
+    if (post.only) return (zotero)
 
   } # End post
 
@@ -586,17 +601,29 @@ CristinMonthly <- \(zotero,
   if (any(nrow(monthlies$items))) {
     extras <- CreateExtras(
       monthlies,
-      sdg.host,
-      sdg.batch,
       get.unpaywall,
       get.ezproxy,
       ezproxy.host,
       local.storage,
       full.update,
       lang,
-      sdg.lang,
       silent,
       log = monthlies$log
+    )
+  }
+
+  # Create SDGs if any monthlies
+  if (any(nrow(monthlies$items))) {
+    sdg <- CreateSdgs(
+      monthlies,
+      sdg.host,
+      sdg.batch,
+      local.storage,
+      full.update,
+      lang,
+      sdg.lang,
+      silent,
+      log = extras$log
     )
   }
 
@@ -604,17 +631,17 @@ CristinMonthly <- \(zotero,
   if (check.items & any(nrow(monthlies$items))) {
 
     # Log examine items
-    extras$log <-  LogCat(
+    sdg$log <-  LogCat(
       "Searching for duplicates and multidepartmental publications",
       silent = silent,
-      log = extras$log
+      log = sdg$log
     )
 
     examine.items <- ExamineItems(
       monthlies$items,
       collections,
       silent,
-      extras$log,
+      sdg$log,
       n.paths
     )
     multidepartmental <- examine.items$multidepartmental
@@ -628,11 +655,33 @@ CristinMonthly <- \(zotero,
       dplyr::select(-c(dplyr::ends_with(".remove")))
   }
 
+  # Add SDG if sdg.model is defined
+  if (any(nrow(monthlies$monthlies)) & any(nrow(sdg$sdg))) {
+
+    print(sdg$sdg)
+
+    col.lang <- if (sdg.lang == "en") "" else paste0("_", sdg.lang)
+    sdgs <- sdg$sdg |>
+      dplyr::select(
+        key,
+        version,
+        sdg = llm_sdgs_final,
+        research.field = .data[[paste0("llm_study_field", col.lang)]],
+        research.type = .data[[paste0("llm_research_type", col.lang)]],
+        research.design = .data[[paste0("llm_research_design", col.lang)]],
+        theories = .data[[paste0("llm_theories", col.lang)]],
+        synopsis = .data[[paste0("llm_synopsis", col.lang)]],
+        keywords = .data[[paste0("llm_keywords", col.lang)]]
+      )
+    monthlies$monthlies <- monthlies$monthlies |>
+      dplyr::left_join(sdgs, by = c("key", "version"))
+  }
+
   # Create return.list
   return.list <- list(
     unit.paths = unit.paths,
     monthlies =  monthlies$monthlies,
-    sdg = extras$sdg,
+    sdg = sdg$sdg,
     updated.keys = monthlies$updated.keys,
     multidepartmental = multidepartmental,
     duplicates = duplicates,

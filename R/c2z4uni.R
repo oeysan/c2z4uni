@@ -221,6 +221,56 @@ GetDoi <- \(doi, extra) {
   return (doi)
 }
 
+#' @title OpenAlex
+#' @keywords internal
+#' @noRd
+OpenAlex <- \(doi) {
+
+  if (any(is.na(GoFish(doi)))) {
+    return (NA)
+  }
+
+  if (!grepl("http", doi)) {
+    doi <- paste0("https://doi.org/", doi)
+  }
+
+  url <- paste0("https://api.openalex.org/works/", doi)
+
+  # Query OpenAlex
+  httr.get <- Online(
+    httr::RETRY(
+      "GET",
+      url = url,
+      quiet = TRUE
+    ),
+    silent = TRUE
+  )
+
+  # Return NA if not found
+  if (httr.get$error) {
+    return (NA)
+  }
+
+  # Create list from JSON
+  openalex <- httr::content(httr.get$data)
+
+  # Try to get location of pdf
+  open.access <- GoFish(openalex$open_access$oa_url)
+
+  # if open.access is not defined try URL
+  if (any(is.na(open.access))) {
+    open.access <- GoFish(openalex$primary_location$pdf_url)
+  }
+
+  # if open.access is not defined try landing site
+  if (any(is.na(open.access))) {
+    open.access <- GoFish(openalex$primary_location$landing_page_url)
+  }
+
+  return (open.access)
+
+}
+
 #' @title Unpaywall
 #' @keywords internal
 #' @noRd
@@ -389,6 +439,91 @@ Dict <- \(x = NULL,
   return (string)
 
 }
+
+#' @title UnlinkItems
+#' @keywords internal
+#' @noRd
+UnlinkItems <- \(remove.keys,
+                 local.storage,
+                 items = FALSE,
+                 bibliography = FALSE,
+                 monthlies = FALSE,
+                 extras = FALSE) {
+
+  # Visible bindings
+  key <- NULL
+
+  if (items) bibliography <- TRUE
+  if (items || bibliography) monthlies <- TRUE
+  if (monthlies) extras <- TRUE
+
+  if (!items) {
+    updated.keys.path <- file.path(local.storage, "updated_keys.rds")
+    updated.keys <- GoFish(readRDS(updated.keys.path))
+    new.keys <- unique(c(updated.keys, remove.keys))
+    saveRDS(new.keys, updated.keys.path)
+  }
+
+  if (items) {
+    items.path <- file.path(local.storage, "items.rds")
+    items <- GoFish(readRDS(items.path))
+    if (any(nrow(items))) {
+      items <- dplyr::filter(items, !key %in% remove.keys)
+      saveRDS(items, items.path)
+    }
+  }
+
+  if (bibliography) {
+    bib.no.path <- file.path(local.storage, "bibliography_no.rds")
+    bib.en.path <- file.path(local.storage, "bibliography_en.rds")
+    bibliography <- GoFish(readRDS(bib.no.path))
+    if (any(nrow(bibliography))) {
+      bibliography <- dplyr::filter(bibliography, !key %in% remove.keys)
+      saveRDS(bibliography, bib.no.path)
+    }
+    bibliography <- GoFish(readRDS(bib.en.path))
+    if (any(nrow(bibliography))) {
+      bibliography <- dplyr::filter(bibliography, !key %in% remove.keys)
+      saveRDS(bibliography, bib.en.path)
+    }
+  }
+
+  if (monthlies) {
+    monthlies.no.path <- file.path(local.storage, "monthlies_no.rds")
+    monthlies.en.path <- file.path(local.storage, "monthlies_en.rds")
+    monthlies <- GoFish(readRDS(monthlies.no.path))
+    if (any(nrow(monthlies))) {
+      monthlies <- dplyr::filter(monthlies, !key %in% remove.keys)
+      saveRDS(monthlies, monthlies.no.path)
+    }
+    monthlies <- GoFish(readRDS(monthlies.en.path))
+    if (any(nrow(monthlies))) {
+      monthlies <- dplyr::filter(monthlies, !key %in% remove.keys)
+      saveRDS(monthlies, monthlies.en.path)
+    }
+  }
+
+  if (extras) {
+    extras.path <- file.path(local.storage, "monthlies_extras.rds")
+    extras <- GoFish(readRDS(extras.path))
+    if (any(nrow(extras))) {
+      extras <- dplyr::filter(extras, !key %in% remove.keys)
+      saveRDS(extras, extras.path)
+    }
+
+    sdg.predictions.path <- file.path(local.storage, "sdg_predictions.rds")
+    sdg.predictions <- GoFish(readRDS(sdg.predictions.path))
+    if (any(nrow(sdg.predictions))) {
+      sdg.predictions <- dplyr::filter(sdg.predictions, !key %in% remove.keys)
+      saveRDS(sdg.predictions, sdg.predictions.path)
+      saveRDS(
+        SdgSummary(sdg.predictions),
+        file.path(local.storage, "sdg_predictions_summary.rds")
+      )
+    }
+  }
+}
+
 
 #' @title Numerus
 #' @keywords internal
@@ -854,7 +989,7 @@ CreateMonthlies <- \(zotero,
       GoFish(type = NULL)
 
     # Check if there are keys in items that are not in bibliography
-    if (any(nrow(items) > nrow(bibliography))) {
+    if (any(nrow(items)) & any(nrow(bibliography))) {
       missing.keys <- items |>
         dplyr::anti_join(bibliography, by = c("key", "version")) |>
         dplyr::pull(key) |>
@@ -975,13 +1110,23 @@ CreateMonthlies <- \(zotero,
       NULL
     )
 
-    # Update if new items
-    if (any(nrow(new.zotero$results)) & any(nrow(monthlies))) {
+    missing.items <- items |>
+      dplyr::anti_join(monthlies[-1,], by = c("key", "version")) |>
+      GoFish(type = NULL)
+
+    missing.bibliography <- bibliography |>
+      dplyr::inner_join(missing.items, by = c("key", "version")) |>
+      GoFish(type = NULL)
+
+    new.keys <- unique(c(new.keys, missing.items$key))
+
+    # Update if missing items
+    if (any(nrow(missing.items))) {
 
       # Create monthlies for new items
       new.monthlies <- EnhanceBib(
-        new.zotero$results,
-        new.zotero$bibliography,
+        missing.items,
+        missing.bibliography,
         collections,
         unit.paths,
         silent
@@ -1040,112 +1185,23 @@ CreateMonthlies <- \(zotero,
 
 }
 
-
-#' @title CreateExtras
+#' @title CreateSdgs
 #' @keywords internal
 #' @noRd
-CreateExtras <- \(monthlies,
-                  sdg.host,
-                  sdg.batch,
-                  get.unpaywall,
-                  get.ezproxy,
-                  ezproxy.host,
-                  local.storage,
-                  full.update,
-                  lang,
-                  sdg.lang,
-                  silent,
-                  log = list()) {
+CreateSdgs <- \(monthlies,
+                sdg.host,
+                sdg.batch,
+                local.storage,
+                full.update,
+                lang,
+                sdg.lang,
+                silent,
+                log = list()) {
 
   # Visible bindings
   sdg <- new.items <- missing.items <- where <- key <- title <- itemType <-
     abstractNote <- extra <- cristin.id <- prefix <- ISBN <- DOI <-
-    doi <- extras <- llm_sdgs_final <- col.lang <- NULL
-
-  # Function to enhance bibliography
-  GetExtras <- \(items,
-                 sdgs,
-                 get.unpaywall,
-                 get.ezproxy,
-                 ezproxy.host,
-                 lang,
-                 sdg.lang,
-                 silent) {
-
-    extras <- items |>
-      dplyr::transmute(
-        key,
-        version,
-        title,
-        type = itemType,
-        abstract = abstractNote,
-        cristin.id = ZoteroId("Cristin", extra),
-        cristin.url = paste0(
-          "https://app.cristin.no/results/show.jsf?id=",
-          cristin.id
-        ),
-        zotero.url = sprintf(
-          "http://zotero.org/%s/items/%s", prefix, key
-        ),
-        cristin.ids = purrr::map(
-          cristin.id, ~ CristinId(.x),
-          .progress = if (!silent) "Finding Cristin IDs" else FALSE
-        ),
-        isbn = GoFish(ISBN),
-        doi =  purrr::pmap_chr(
-          list(GoFish(DOI), GoFish(extra)), ~
-            GetDoi(...),
-          .progress = if (!silent) "Finding DOI" else FALSE
-        ),
-        extra
-      )
-
-    # Add SDG if sdg.model is defined
-    if (any(nrow(sdgs))) {
-      col.lang <- if (sdg.lang == "en") "" else paste0("_", sdg.lang)
-      sdgs <- sdgs |>
-        dplyr::select(
-          key,
-          sdg = llm_sdgs_final,
-          research.field = .data[[paste0("llm_study_field", col.lang)]],
-          research.type = .data[[paste0("llm_research_type", col.lang)]],
-          research.design = .data[[paste0("llm_research_design", col.lang)]],
-          theories = .data[[paste0("llm_theories", col.lang)]],
-          synopsis = .data[[paste0("llm_synopsis", col.lang)]],
-          keywords = .data[[paste0("llm_keywords", col.lang)]]
-        )
-      extras <- dplyr::left_join(extras, sdgs, by = "key")
-    }
-
-    # Add unpaywall if get.unpaywall is TRUE
-    if (get.unpaywall) {
-      extras <- extras |>
-        dplyr::mutate(
-          unpaywall =  purrr::map_chr(
-            doi, ~ Unpaywall(.x),
-            .progress = if (!silent) "Searching Unpaywall" else FALSE
-          )
-        )
-    }
-
-    # Add ezproxy if get.ezproxy is TRUE
-    if (get.ezproxy) {
-      extras <- extras |>
-        dplyr::mutate(
-          ezproxy =
-            dplyr::case_when(
-              !is.na(GoFish(unpaywall)) ~ NA_character_,
-              TRUE ~ purrr::map_chr(
-                doi, ~ Ezproxy(.x, host = ezproxy.host),
-                .progress = if (!silent) "Defining EZproxy" else FALSE
-              )
-            )
-        )
-    }
-
-    return (extras)
-
-  }
+    doi <- extras <- NULL
 
   # Try to restore sdgs to local storage if defined
   if (!is.null(local.storage)) {
@@ -1188,6 +1244,11 @@ CreateExtras <- \(monthlies,
   if (!is.null(local.storage) & !is.null(sdg.host)) {
 
     if (any(nrow(sdg))) {
+
+      # Sort SDGs tibble
+      sdg <- sdg |>
+        dplyr::select(key, version, dplyr::everything())
+
       # Log
       log <-  LogCat(
         "Saving SDG predictions",
@@ -1199,6 +1260,99 @@ CreateExtras <- \(monthlies,
         file.path(local.storage, "sdg_predictions.rds")
       )
     }
+  }
+
+  # Create return.list
+  return.list <- list(
+    sdg = sdg,
+    log = log
+  )
+
+  return (return.list)
+
+}
+
+#' @title CreateExtras
+#' @keywords internal
+#' @noRd
+CreateExtras <- \(monthlies,
+                  get.unpaywall,
+                  get.ezproxy,
+                  ezproxy.host,
+                  local.storage,
+                  full.update,
+                  lang,
+                  silent,
+                  log = list()) {
+
+  # Visible bindings
+  new.items <- missing.items <- where <- key <- title <- itemType <-
+    abstractNote <- extra <- cristin.id <- prefix <- ISBN <- DOI <-
+    doi <- extras <- NULL
+
+  # Function to enhance bibliography
+  GetExtras <- \(items,
+                 get.unpaywall,
+                 get.ezproxy,
+                 ezproxy.host,
+                 silent) {
+
+    extras <- items |>
+      dplyr::transmute(
+        key,
+        version,
+        title,
+        type = itemType,
+        abstract = abstractNote,
+        cristin.id = ZoteroId("Cristin", extra),
+        cristin.url = paste0(
+          "https://app.cristin.no/results/show.jsf?id=",
+          cristin.id
+        ),
+        zotero.url = sprintf(
+          "http://zotero.org/%s/items/%s", prefix, key
+        ),
+        cristin.ids = purrr::map(
+          cristin.id, ~ CristinId(.x),
+          .progress = if (!silent) "Finding Cristin IDs" else FALSE
+        ),
+        isbn = GoFish(ISBN),
+        doi =  purrr::pmap_chr(
+          list(GoFish(DOI), GoFish(extra)), ~
+            GetDoi(...),
+          .progress = if (!silent) "Finding DOI" else FALSE
+        ),
+        extra
+      )
+
+    # Add unpaywall if get.unpaywall is TRUE
+    if (get.unpaywall) {
+      extras <- extras |>
+        dplyr::mutate(
+          unpaywall =  purrr::map_chr(
+            doi, ~ OpenAlex(.x),
+            .progress = if (!silent) "Searching Unpaywall" else FALSE
+          )
+        )
+    }
+
+    # Add ezproxy if get.ezproxy is TRUE
+    if (get.ezproxy) {
+      extras <- extras |>
+        dplyr::mutate(
+          ezproxy =
+            dplyr::case_when(
+              !is.na(GoFish(unpaywall)) ~ NA_character_,
+              TRUE ~ purrr::map_chr(
+                doi, ~ Ezproxy(.x, host = ezproxy.host),
+                .progress = if (!silent) "Defining EZproxy" else FALSE
+              )
+            )
+        )
+    }
+
+    return (extras)
+
   }
 
   # Try to restore monthlies to local storage if defined
@@ -1213,7 +1367,7 @@ CreateExtras <- \(monthlies,
 
     extras <- GoFish(
       readRDS(
-        file.path(local.storage, paste0("monthlies_extras_", lang, ".rds"))
+        file.path(local.storage, "monthlies_extras.rds")
       ),
       NULL
     )
@@ -1229,12 +1383,9 @@ CreateExtras <- \(monthlies,
       # Create monthlies for new items
       new.extras <- GetExtras(
         missing.items,
-        sdg,
         get.unpaywall,
         get.ezproxy,
         ezproxy.host,
-        lang,
-        sdg.lang,
         silent
       )
 
@@ -1250,12 +1401,9 @@ CreateExtras <- \(monthlies,
 
     extras <- GetExtras(
       monthlies$items,
-      sdg,
       get.unpaywall,
       get.ezproxy,
       ezproxy.host,
-      lang,
-      sdg.lang,
       silent
     )
 
@@ -1273,7 +1421,7 @@ CreateExtras <- \(monthlies,
       )
       saveRDS(
         extras,
-        file.path(local.storage, paste0("monthlies_extras_", lang, ".rds"))
+        file.path(local.storage, "monthlies_extras.rds")
       )
     }
 
@@ -1282,7 +1430,6 @@ CreateExtras <- \(monthlies,
   # Create return.list
   return.list <- list(
     extras = extras,
-    sdg = sdg,
     log = log
   )
 
@@ -2597,6 +2744,154 @@ Pad <- \(string, sep = "-", max.width = 80) {
   padded <- paste0(head.char, string, tail.char)
 
   return (padded)
+
+}
+
+#' @title Length
+#' @keywords internal
+#' @noRd
+Length <- \(data, by.row = TRUE) {
+
+  # Visible bindings
+  k <- n <- 0
+
+  if (is.data.frame(data)) {
+    n <- if (by.row) nrow(data) else ncol(data)
+  } else if (is.list(data)) {
+    k <- length(data)
+    if (is.data.frame(data[[1]])) {
+      all.data <- bind_rows(data)
+      n <- if (by.row) nrow(all.data) else ncol(all.data)
+    } else {
+      n <- length(unlist(data))
+    }
+  } else {
+    n <- length(data)
+  }
+
+  return.list <- list(n = n, k = k)
+
+  return (return.list)
+
+}
+
+#' @title GetEta
+#' @keywords internal
+#' @noRd
+GetEta <- \(data,
+            func,
+            by.row = TRUE,
+            message = NULL,
+            message.col = NULL,
+            sep = "\u2014",
+            max.width = 80,
+            silent = FALSE,
+            log = list()) {
+
+  # Visible bindings
+  results <- NULL
+
+  lengths <- Length(data)
+  total <- lengths$n
+  n.message <- Numerus(total, "item")
+  if (lengths$k > 0){
+    total <- lengths$k
+    n.message <- sprintf(
+      "%s using %s",
+      n.message,
+      Numerus(total, "iteration")
+    )
+  }
+
+  query.start <- Sys.time()
+  start.message <- sprintf(
+    "Process on %s started %s",
+    n.message,
+    format(query.start, "%d.%m.%Y - %H:%M:%S")
+  )
+
+  # Start eta
+  log <- LogCat(start.message, silent = silent, log = log)
+
+  if (is.data.frame(data)) {
+
+    if (by.row) {
+
+      for (i in seq_len(total)) {
+
+        results <- dplyr::bind_rows(results, func(data[i, ]))
+
+        if (!is.null(message.col)) {
+          eta.message <- paste0(
+            message, " ", as.character(data[i, message.col])
+          )
+        } else {
+          eta.message <- message
+        }
+
+        # Estimate time of arrival
+        log.eta <-
+          LogCat(
+            Eta(query.start, i, total, eta.message),
+            silent = silent,
+            flush = TRUE,
+            log = log,
+            append.log = FALSE
+          )
+      }
+
+    } else {
+
+      for (i in seq_len(total)) {
+
+        results <- dplyr::bind_cols(results, func(data[, i]))
+
+        # Estimate time of arrival
+        log.eta <-
+          LogCat(
+            Eta(query.start, i, total),
+            silent = silent,
+            flush = TRUE,
+            log = log,
+            append.log = FALSE
+          )
+      }
+    }
+
+  } else {
+
+    for (i in seq_len(total)) {
+
+      results <- c(results, func(data[[i]]))
+
+      # Estimate time of arrival
+      log.eta <-
+        LogCat(
+          Eta(query.start, i, total),
+          silent = silent,
+          flush = TRUE,
+          log = log,
+          append.log = FALSE
+        )
+    }
+
+  }
+
+  query.end <- Sys.time()
+  end.message <- sprintf(
+    "Process ended %s",
+    format(query.end, "%d.%m.%Y - %H:%M:%S")
+  )
+
+  # End ETA
+  log <- LogCat(end.message, silent = silent, log = log.eta)
+
+  return.list <- list(
+    results = results,
+    log = log
+  )
+
+  return (return.list)
 
 }
 
