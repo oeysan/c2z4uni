@@ -64,8 +64,10 @@ CristinWeb <- function(monthlies,
   cristin.id <- inn.cards <- NULL
 
   # Languages
-  # Set language to en if not no
-  lang <- if (lang %in% c("no", "nn", "nb")) "no" else "en"
+  # Set lang as nn if no
+  if (lang %in% c("no")) lang <- "nn"
+  # Set lang to en if not Norwegian
+  if (!lang %in% c("nb", "nn", "no")) lang <- "en"
 
   # Update user info @ inn if user.cards = TRUE
   if (user.cards) {
@@ -78,7 +80,8 @@ CristinWeb <- function(monthlies,
     title <- reference <- abstract <- contributors <- sdg <- archive <-
       unpaywall <- ezproxy <- reference.button <- abstract.button <-
       contributors.button <- sdg.button <- cristin.button <- zotero.button <-
-      archive.button <- unpaywall.button <- ezproxy.button <- NULL
+      archive.button <- unpaywall.button <- ezproxy.button <- about <-
+      about.button <- keywords <- keywords.button <- NULL
 
     # Function to create a vector of collection names
     CollectionNames <- function(x) {
@@ -103,6 +106,46 @@ CristinWeb <- function(monthlies,
         id = paste0("csl-bib-container-", item$key),
         class = "csl-bib-container",
         htmltools::HTML(item$bib)
+      )
+    }
+
+    # Keywords
+    keywords <- item |>
+      mutate(
+        keywords = purrr::map_chr(
+          Map(c, research.type, research.design, keywords),
+          ~ paste(.x, collapse = ", "))
+      ) |>
+      dplyr::pull(keywords) |>
+      GoFish()
+    if (any(!is.na(GoFish(keywords)))) {
+
+      keywords <- htmltools::tags$article(
+        htmltools::h1(Dict("keywords", lang)),
+        keywords,
+        id = paste0("keywords-article-", item$key),
+        class = "abstract-article"
+      )
+      keywords.button <- htmltools::a(
+        Dict("keywords", lang),
+        href = paste0("#", paste0("keywords-article-", item$key)),
+        class = "csl-bib-button"
+      )
+    }
+
+
+    # Synopsis
+    if (any(!is.na(GoFish(item$synopsis)))) {
+      about <- htmltools::tags$article(
+        htmltools::h1(Dict("about_pub", lang)),
+        item$synopsis,
+        id = paste0("about-article-", item$key),
+        class = "abstract-article"
+      )
+      about.button <- htmltools::a(
+        Dict("about_pub", lang),
+        href = paste0("#", paste0("about-article-", item$key)),
+        class = "csl-bib-button"
       )
     }
 
@@ -242,7 +285,8 @@ CristinWeb <- function(monthlies,
           archive.button,
           cristin.button,
           zotero.button,
-          abstract.button,
+          keywords.button,
+          about.button,
           contributors.button,
           sdg.button,
           unpaywall.button,
@@ -254,6 +298,10 @@ CristinWeb <- function(monthlies,
         )
       ),
       htmltools::div(
+        # About
+        about,
+        # Keywords,
+        keywords,
         # Abstract
         abstract,
         # Contributors

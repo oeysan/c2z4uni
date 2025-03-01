@@ -40,7 +40,7 @@ NULL
 #' @keywords internal
 #' @noRd
 .onLoad <- function(libname, pkgname) {
-  DictLoad("no", pkgname)
+  DictLoad("nn", pkgname)
   DictLoad("en", pkgname)
 }
 
@@ -48,6 +48,7 @@ NULL
 #' @keywords internal
 #' @noRd
 zotero.types <- c2z::zotero.types
+supported.lang <- c("nn", "nb", "en")
 
 ################################################################################
 ###############################Internal Functions###############################
@@ -360,7 +361,7 @@ CheckDesc <- \(type, change.value = NULL) {
 #' @title DictLoad
 #' @keywords internal
 #' @noRd
-DictLoad <- \(lang = "no", pkgname) {
+DictLoad <- \(lang = "nn", pkgname) {
 
   # Get the path to the CSV file
   csv.file <- system.file(
@@ -380,24 +381,19 @@ DictLoad <- \(lang = "no", pkgname) {
 #' @keywords internal
 #' @noRd
 Dict <- \(x = NULL,
-          lang = "no",
+          lang = "nn",
           count = 1,
           to.lower = FALSE,
           prefix = FALSE,
           error = NULL,
           i18n = NULL) {
 
-
-
   # Visible bindings
   key <- NULL
 
-  # Define language
-  lang <- if (!lang %in% c("nb", "nn", "no")) "en" else "no"
-
   # Use extdata if data is not defined
   if (is.null(i18n)) {
-    i18n <- if (lang == "no") i18n.no else i18n.en
+    i18n <- get(paste0("i18n.", lang))
   }
 
   # Return Dict data if x not defined
@@ -445,6 +441,7 @@ Dict <- \(x = NULL,
 #' @noRd
 UnlinkItems <- \(remove.keys,
                  local.storage,
+                 supported.lang,
                  items = FALSE,
                  bibliography = FALSE,
                  monthlies = FALSE,
@@ -457,6 +454,15 @@ UnlinkItems <- \(remove.keys,
   if (items || bibliography) monthlies <- TRUE
   if (monthlies) extras <- TRUE
 
+  ProcessRds <- \(path, remove.keys) {
+    path <- file.path(local.storage, paste0(path, ".rds"))
+    data <- GoFish(readRDS(path))
+    if (any(nrow(data))) {
+      data <- dplyr::filter(data, !key %in% remove.keys)
+      saveRDS(data, path)
+    }
+  }
+
   if (!items) {
     updated.keys.path <- file.path(local.storage, "updated_keys.rds")
     updated.keys <- GoFish(readRDS(updated.keys.path))
@@ -464,66 +470,30 @@ UnlinkItems <- \(remove.keys,
     saveRDS(new.keys, updated.keys.path)
   }
 
-  if (items) {
-    items.path <- file.path(local.storage, "items.rds")
-    items <- GoFish(readRDS(items.path))
-    if (any(nrow(items))) {
-      items <- dplyr::filter(items, !key %in% remove.keys)
-      saveRDS(items, items.path)
-    }
-  }
+  if (items) ProcessRds("items", remove.keys)
 
   if (bibliography) {
-    bib.no.path <- file.path(local.storage, "bibliography_no.rds")
-    bib.en.path <- file.path(local.storage, "bibliography_en.rds")
-    bibliography <- GoFish(readRDS(bib.no.path))
-    if (any(nrow(bibliography))) {
-      bibliography <- dplyr::filter(bibliography, !key %in% remove.keys)
-      saveRDS(bibliography, bib.no.path)
-    }
-    bibliography <- GoFish(readRDS(bib.en.path))
-    if (any(nrow(bibliography))) {
-      bibliography <- dplyr::filter(bibliography, !key %in% remove.keys)
-      saveRDS(bibliography, bib.en.path)
+    for (lang in supported.lang) {
+      ProcessRds(paste0("bibliography_", lang), remove.keys)
     }
   }
 
   if (monthlies) {
-    monthlies.no.path <- file.path(local.storage, "monthlies_no.rds")
-    monthlies.en.path <- file.path(local.storage, "monthlies_en.rds")
-    monthlies <- GoFish(readRDS(monthlies.no.path))
-    if (any(nrow(monthlies))) {
-      monthlies <- dplyr::filter(monthlies, !key %in% remove.keys)
-      saveRDS(monthlies, monthlies.no.path)
-    }
-    monthlies <- GoFish(readRDS(monthlies.en.path))
-    if (any(nrow(monthlies))) {
-      monthlies <- dplyr::filter(monthlies, !key %in% remove.keys)
-      saveRDS(monthlies, monthlies.en.path)
+    for (lang in supported_lang) {
+      ProcessRds(paste0("monthlies_", lang), remove.keys)
     }
   }
 
   if (extras) {
-    extras.path <- file.path(local.storage, "monthlies_extras.rds")
-    extras <- GoFish(readRDS(extras.path))
-    if (any(nrow(extras))) {
-      extras <- dplyr::filter(extras, !key %in% remove.keys)
-      saveRDS(extras, extras.path)
-    }
-
-    sdg.predictions.path <- file.path(local.storage, "sdg_predictions.rds")
-    sdg.predictions <- GoFish(readRDS(sdg.predictions.path))
-    if (any(nrow(sdg.predictions))) {
-      sdg.predictions <- dplyr::filter(sdg.predictions, !key %in% remove.keys)
-      saveRDS(sdg.predictions, sdg.predictions.path)
-      saveRDS(
-        SdgSummary(sdg.predictions),
-        file.path(local.storage, "sdg_predictions_summary.rds")
-      )
-    }
+    ProcessRds("monthlies_extras", remove.keys)
+    data <- ProcessRds("sdg_predictions", remove.keys)
+    saveRDS(
+      SdgSummary(data),
+      file.path(local.storage, "sdg_predictions_summary.rds")
+    )
   }
-}
 
+}
 
 #' @title Numerus
 #' @keywords internal
@@ -736,7 +706,7 @@ SdgSummary <- \(data, column = "llm_sdgs_final") {
 #' @noRd
 SdgInfo <- \(sdg.sum,
              range = NULL,
-             lang = "no",
+             lang = "nn",
              sdg.path = NULL,
              archive.url = NULL,
              archive.append = NULL,
@@ -745,18 +715,19 @@ SdgInfo <- \(sdg.sum,
 
   # Languages
   # Set language to en if not nb or nn
-  lang <- if (!lang %in% c("nb", "nn", "no")) "en" else "no"
+  lang <- if (!lang %in% c("nb", "nn", "no")) "en" else "nn"
+  sdg.lang <- if(lang == "nn") "nno-NO" else "nnb-NO"
 
-  SdgUrls <- \(lang = "no", sdgs) {
+  SdgUrls <- \(lang = "nn", sdgs) {
 
     # Find Norwegian urls
-    if (lang == "no") {
+    if (lang == "nn") {
 
       httr.get <- Online(
         httr::RETRY(
           "GET",
           "https://www.fn.no/om-fn/fns-baerekraftsmaal",
-          query = list(lang = "nno-NO"),
+          query = list(lang = sdg.lang),
           quiet = TRUE),
         silent = TRUE
       )
@@ -1194,7 +1165,6 @@ CreateSdgs <- \(monthlies,
                 local.storage,
                 full.update,
                 lang,
-                sdg.lang,
                 silent,
                 log = list()) {
 
@@ -1879,7 +1849,7 @@ InnCards <- \(url, error = NA) {
 #' @keywords internal
 #' @noRd
 InnUsers <- \(i = 1,
-              lang = "no",
+              lang = "nn",
               get.cristin = TRUE,
               get.cards = TRUE,
               silent = FALSE,
@@ -1912,10 +1882,6 @@ InnUsers <- \(i = 1,
 
   # Visible bindings
   first.name <- last.name <- full.name <- card <- cristin.id <- NULL
-
-  # Languages
-  # Set language to en if not nb or nn
-  lang <- if (!lang %in% c("nb", "nn", "no")) "en" else "no"
 
   # Definitions
   card.url <- Dict("inn.url", lang)

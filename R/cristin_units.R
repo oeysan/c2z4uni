@@ -37,7 +37,7 @@ CristinUnits <- \(unit.key,
   # Languages
   # Set lang as nn if no
   if (lang %in% c("no")) lang <- "nn"
-  # Set lang to en if not norwegian
+  # Set lang to en if not Norwegian
   if (!lang %in% c("nb", "nn", "no")) lang <- "en"
 
   # Definitions

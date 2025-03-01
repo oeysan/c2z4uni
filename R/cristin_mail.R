@@ -64,8 +64,10 @@ CristinMail <- \(unit.key,
     collection.names <- bib.item <- bib.body <- key <- NULL
 
   # Languages
-  # Set language to en if not no
-  lang <- if (lang %in% c("no", "nn", "nb")) "no" else "en"
+  # Set lang as nn if no
+  if (lang %in% c("no")) lang <- "nn"
+  # Set lang to en if not Norwegian
+  if (!lang %in% c("nb", "nn", "no")) lang <- "en"
 
   # Definitions
   monthlies <- cristin.monthly$monthlies

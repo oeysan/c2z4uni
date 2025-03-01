@@ -115,10 +115,10 @@ CristinMonthly <- \(zotero,
     duplicates <- extras <- cristin.id <- items <- collections <- NULL
 
   # Languages
-  sdg.lang <- if (lang %in% c("no")) "nn" else lang
-  # Set language to en if not no
-  lang <- if (lang %in% c("no", "nn", "nb")) "no" else "en"
-  post.lang <- if (post.lang %in% c("no", "nn", "nb")) "no" else "en"
+  # Set lang as nn if no
+  if (lang %in% c("no")) lang <- "nn"
+  # Set lang to en if not Norwegian
+  if (!lang %in% c("nb", "nn", "no")) lang <- "en"
 
   # Define units
   units <- CristinUnits(
@@ -621,7 +621,6 @@ CristinMonthly <- \(zotero,
       local.storage,
       full.update,
       lang,
-      sdg.lang,
       silent,
       log = extras$log
     )
@@ -658,18 +657,18 @@ CristinMonthly <- \(zotero,
   # Add SDG if sdg.model is defined
   if (any(nrow(monthlies$monthlies)) & any(nrow(sdg$sdg))) {
 
-    col.lang <- if (sdg.lang == "en") "" else paste0("_", sdg.lang)
+    col.lang <- if (lang == "en") "" else paste0("_", lang)
     sdgs <- sdg$sdg |>
       dplyr::select(
         key,
         version,
         sdg = llm_sdgs_final,
-        research.field = .data[[paste0("llm_study_field", col.lang)]],
-        research.type = .data[[paste0("llm_research_type", col.lang)]],
-        research.design = .data[[paste0("llm_research_design", col.lang)]],
-        theories = .data[[paste0("llm_theories", col.lang)]],
-        synopsis = .data[[paste0("llm_synopsis", col.lang)]],
-        keywords = .data[[paste0("llm_keywords", col.lang)]]
+        research.field = !!sym(paste0("llm_keywords", col.lang)),
+        research.type = !!sym(paste0("llm_research_type", col.lang)),
+        research.design = !!sym(paste0("llm_research_design", col.lang)),
+        theories = !!sym(paste0("llm_theories", col.lang)),
+        synopsis = !!sym(paste0("llm_synopsis", col.lang)),
+        keywords = !!sym(paste0("llm_keywords", col.lang))
       )
     monthlies$monthlies <- monthlies$monthlies |>
       dplyr::left_join(sdgs, by = c("key", "version"))
