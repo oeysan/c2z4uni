@@ -1082,7 +1082,7 @@ CreateMonthlies <- \(zotero,
     )
 
     missing.items <- items |>
-      dplyr::anti_join(monthlies[-1,], by = c("key", "version")) |>
+      dplyr::anti_join(monthlies, by = c("key", "version")) |>
       GoFish(type = NULL)
 
     missing.bibliography <- bibliography |>
