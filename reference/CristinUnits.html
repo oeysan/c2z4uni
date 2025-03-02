@@ -20,7 +20,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9035</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9036</span>
       </span>
     </div>
 
@@ -115,9 +115,17 @@ selected units</p>
 <span class="r-in"><span>  <span class="fu">CristinUnits</span><span class="op">(</span><span class="st">"209.0.0.0"</span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
 <span class="r-in"><span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">id</span>, <span class="va">path2</span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
 <span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span>width <span class="op">=</span> <span class="fl">80</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in dplyr::mutate(bind_rows(unlist(c(GoFish(units.data$parent_units$unit_name,     NULL), name = units.data$unit_name))), path = dplyr::case_when("subunits" %in%     names(units.data) ~ affiliation, TRUE ~ NA_character_), core = purrr::pmap(dplyr::across(!dplyr::last_col()),     ~unname(c(...)))):</span> <span style="color: #00BBBB;">ℹ</span> In argument: `path = dplyr::case_when(...)`.</span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span style="font-weight: bold;">Caused by error in `dplyr::case_when()`:</span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span style="color: #BBBB00;">!</span> `..1 (right)` must be a vector, not `NULL`.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 8 × 2</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   id        path2                                                              </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                                                              </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> 209.0.0.0 Affiliated                                                         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> 209.7.0.0 Administration                                                     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> 209.2.0.0 Faculty of Applied Ecology, Agricultural Sciences and Biotechnology</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> 209.3.0.0 Faculty of Audiovisual Media and Creative Technologies             </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span> 209.5.0.0 Faculty of Education                                               </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">6</span> 209.4.0.0 Faculty of Social and Health Sciences                              </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">7</span> 209.6.0.0 Inland School of Business and Social Sciences                      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">8</span> 209.1.0.0 The Norwegian Film School                                          </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
