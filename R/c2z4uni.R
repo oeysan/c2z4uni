@@ -36,6 +36,9 @@ NULL
 #################################Internal Data##################################
 ################################################################################
 
+# Create a mutable environment for dictionaries.
+.dictEnv <- new.env(parent = emptyenv())
+
 #' @title i18n
 #' @keywords internal
 #' @noRd
@@ -53,6 +56,82 @@ supported.lang <- c("nn", "nb", "en")
 ################################################################################
 ###############################Internal Functions###############################
 ################################################################################
+
+#' @title DictLoad
+#' @description Loads a JSON dictionary for the given language and stores it in a mutable environment.
+#' @keywords internal
+#' @noRd
+DictLoad <- function(lang = "nn", pkgname) {
+  # Build the path to the JSON file (instead of CSV)
+  json.file <- system.file(
+    "extdata/i18n",
+    paste0(lang, ".json"),
+    package = pkgname
+  )
+
+  if (json.file == "") {
+    stop("JSON file not found for language: ", lang)
+  }
+
+  # Read the JSON file into a list using jsonlite
+  dict.data <- jsonlite::fromJSON(json.file)
+
+  # Store the dictionary in the mutable environment
+  assign(lang, dict.data, envir = .dictEnv)
+}
+
+#' @title Dict
+#' @description Retrieves a translated string from the loaded dictionary.
+#'              If the translation is a list (e.g., handling singular/plural forms),
+#'              Numerus is used to determine the correct form.
+#' @keywords internal
+#' @noRd
+Dict <- function(x = NULL,
+                 lang = "nn",
+                 count = 1,
+                 to.lower = FALSE,
+                 prefix = FALSE,
+                 error = NULL,
+                 i18n = NULL) {
+
+  # Retrieve the dictionary from the mutable environment if not provided
+  if (is.null(i18n)) {
+    if (!exists(lang, envir = .dictEnv)) {
+      stop("Language not loaded: ", lang)
+    }
+    i18n <- get(lang, envir = .dictEnv)
+  }
+
+  # If no key is provided, return the entire dictionary
+  if (is.null(x)) {
+    return(i18n)
+  }
+
+  # Retrieve the translation using the key 'x'
+  translation <- i18n[[x]]
+
+  # If translation is not found, return the provided error value
+  if (is.null(translation)) {
+    return(error)
+  }
+
+  # Use Numerus for translations that are lists (supporting singular/plural forms)
+  if (is.list(translation)) {
+    string <- Numerus(count, translation$one, translation$other, prefix)
+  } else {
+    string <- translation
+    if (prefix) {
+      string <- paste(count, string)
+    }
+  }
+
+  # Convert the string to lower case if requested
+  if (to.lower && !is.null(string)) {
+    string <- tolower(string)
+  }
+
+  return(string)
+}
 
 #' @title EtALSimple
 #' @keywords internal
@@ -355,84 +434,6 @@ CheckDesc <- \(type, change.value = NULL) {
   }
 
   return (value)
-
-}
-
-#' @title DictLoad
-#' @keywords internal
-#' @noRd
-DictLoad <- \(lang = "nn", pkgname) {
-
-  # Get the path to the CSV file
-  csv.file <- system.file(
-    "extdata/i18n",
-    paste0(lang, ".csv"),
-    package = pkgname
-  )
-  # Read the CSV file into a data frame
-  dict.data <- readr::read_csv(csv.file, col_types = readr::cols())
-
-  # Export dict.data
-  assign(paste0("i18n.", lang), dict.data, envir = asNamespace(pkgname))
-
-}
-
-#' @title Dict
-#' @keywords internal
-#' @noRd
-Dict <- \(x = NULL,
-          lang = "nn",
-          count = 1,
-          to.lower = FALSE,
-          prefix = FALSE,
-          error = NULL,
-          i18n = NULL) {
-
-  # Visible bindings
-  key <- NULL
-
-  # Use extdata if data is not defined
-  if (is.null(i18n)) {
-    i18n <- get(paste0("i18n.", lang))
-  }
-
-  # Return Dict data if x not defined
-  if (is.null(x)) {
-    return (i18n)
-  }
-
-  # Define singular or pluralis
-  numerus <- if (count == 1) "singularis" else "pluralis"
-  anti.numerus <- if (count != 1)  "singularis" else "pluralis"
-
-  # Create dictionary
-  string <- i18n |>
-    # Filter by defined string
-    dplyr::filter(tolower(x) == tolower(key)) |>
-    # Decide numerus
-    dplyr::mutate(
-      numerus = dplyr::case_when(
-        # Set as numerus if not NA
-        !is.na(!!rlang::sym(numerus)) ~ !!rlang::sym(numerus),
-        # Set as anti.numerus if NA
-        TRUE ~ !!rlang::sym(anti.numerus)
-      )
-    ) |>
-    # Pull numerus
-    dplyr::pull(numerus) |>
-    # Trim
-    Trim()
-
-  # Set as tolower if TRUE
-  if (to.lower) string <- tolower(string)
-
-  # Append count if prefix is TRUE
-  if (prefix & any(length(string))) string <- paste(count, string)
-
-  # set as error of x still not defined
-  if (!length(string)) string <- error
-
-  return (string)
 
 }
 
