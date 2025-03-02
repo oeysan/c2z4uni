@@ -768,6 +768,8 @@ SdgInfo <- \(sdg.sum,
   # Urls
   sdg.urls <- SdgUrls(lang, sdgs)
 
+  i <- 1
+
   # Initialize an empty list to store the HTML code for each SDG
   sdg.html <- lapply(seq_along(sdgs), \(i) {
     x <- sdgs[[i]]
@@ -778,7 +780,7 @@ SdgInfo <- \(sdg.sum,
       paste0("?sdg=", x, archive.append, "#archive")
     )
     sdg.image <- file.path(sdg.path, sprintf("sdg%02d_%s.png", x, lang))
-    sdg.publications <- Dict("publication", lang, sdg.sum[[x]])
+    sdg.publications <- Dict("publication", lang, sdg.sum[[i]])
     sdg.span <- sprintf("%s", sdg.sum[[i]])
     sdg.url <- sprintf("%s", sdg.urls[[i]])
 

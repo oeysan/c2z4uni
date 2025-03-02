@@ -1,7 +1,7 @@
 Type: Package
 Package: c2z4uni
 Title: A Reference Manager for (Norwegian) Universities
-Version: 0.1.0.9039
+Version: 0.1.0.9040
 Authors@R: 
     person("Øystein Olav", "Skaar", , "oeysan@gmail.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0001-5605-3492"))
