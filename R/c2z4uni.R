@@ -718,7 +718,7 @@ SdgInfo <- \(sdg.sum,
   SdgUrls <- \(lang = "nn", sdgs) {
 
     # Find Norwegian urls
-    if (lang == "nn") {
+    if (lang == "nn" || lang == "nb") {
 
       httr.get <- Online(
         httr::RETRY(
@@ -771,7 +771,7 @@ SdgInfo <- \(sdg.sum,
       paste0("?sdg=", x, archive.append, "#archive")
     )
     sdg.image <- file.path(sdg.path, sprintf("sdg%02d_%s.png", x, lang))
-    sdg.publications <- Dict("publications", lang, sdg.sum[[i]])
+    sdg.publications <- Dict("publication", lang, sdg.sum[[x]])
     sdg.span <- sprintf("%s", sdg.sum[[i]])
     sdg.url <- sprintf("%s", sdg.urls[[i]])
 
@@ -799,7 +799,7 @@ SdgInfo <- \(sdg.sum,
 
   })
 
-  return( sdg.html[lengths(sdg.html) > 0])
+  return(sdg.html[lengths(sdg.html) > 0])
 
 }
 

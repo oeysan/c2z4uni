@@ -76,15 +76,16 @@ CristinWeb <- function(monthlies,
 
   # Function to create md files
   CreateMd <- function(item) {
+
     # Visible bindings
     title <- reference <- abstract <- contributors <- sdg <- archive <-
       unpaywall <- ezproxy <- reference.button <- abstract.button <-
       contributors.button <- sdg.button <- cristin.button <- zotero.button <-
-      archive.button <- unpaywall.button <- ezproxy.button <- about <-
-      about.button <- keywords <- keywords.button <- NULL
+      archive.button <- unpaywall.button <- ezproxy.button <- keywords <-
+      keywords.button <- synopsis <- synopsis.button <- NULL
 
     # Function to create a vector of collection names
-    CollectionNames <- function(x) {
+    CollectionNames <- \(x) {
       x |>
         unlist() |>
         strsplit(split = "\\|\\|") |>
@@ -117,9 +118,8 @@ CristinWeb <- function(monthlies,
           ~ paste(.x, collapse = ", "))
       ) |>
       dplyr::pull(keywords) |>
-      GoFish()
-    if (any(!is.na(GoFish(keywords)))) {
-
+      GoFish(type == "")
+    if (keywords != "") {
       keywords <- htmltools::tags$article(
         htmltools::h1(Dict("keywords", lang)),
         keywords,
@@ -133,16 +133,15 @@ CristinWeb <- function(monthlies,
       )
     }
 
-
     # Synopsis
     if (any(!is.na(GoFish(item$synopsis)))) {
-      about <- htmltools::tags$article(
+      synopsis <- htmltools::tags$article(
         htmltools::h1(Dict("about_pub", lang)),
         item$synopsis,
         id = paste0("about-article-", item$key),
         class = "abstract-article"
       )
-      about.button <- htmltools::a(
+      synopsis.button <- htmltools::a(
         Dict("about_pub", lang),
         href = paste0("#", paste0("about-article-", item$key)),
         class = "csl-bib-button"
@@ -286,7 +285,7 @@ CristinWeb <- function(monthlies,
           cristin.button,
           zotero.button,
           keywords.button,
-          about.button,
+          synopsis.button,
           contributors.button,
           sdg.button,
           unpaywall.button,
@@ -298,8 +297,8 @@ CristinWeb <- function(monthlies,
         )
       ),
       htmltools::div(
-        # About
-        about,
+        # Synopsis
+        synopsis,
         # Keywords,
         keywords,
         # Abstract
@@ -332,17 +331,17 @@ CristinWeb <- function(monthlies,
   # Cycle through monthlies and create markdowns
   for (i in seq_len(nrow(monthlies))) {
     markdowns[[i]] <- CreateMd(monthlies[i, ])
-  # Estimate time of arrival
-  log.eta <-
-    LogCat(
-      Eta(query.start,
-          i,
-          nrow(monthlies)),
-      silent = silent,
-      flush = TRUE,
-      log = log,
-      append.log = FALSE
-    )
+    # Estimate time of arrival
+    log.eta <-
+      LogCat(
+        Eta(query.start,
+            i,
+            nrow(monthlies)),
+        silent = silent,
+        flush = TRUE,
+        log = log,
+        append.log = FALSE
+      )
   }
 
   # Create tibble
