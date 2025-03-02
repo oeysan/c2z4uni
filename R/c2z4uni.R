@@ -720,20 +720,27 @@ SdgInfo <- \(sdg.sum,
     # Find Norwegian urls
     if (lang == "nn" || lang == "nb") {
 
-      httr.get <- Online(
-        httr::RETRY(
-          "GET",
-          "https://www.fn.no/om-fn/fns-baerekraftsmaal",
-          query = list(lang = sdg.lang),
-          quiet = TRUE),
-        silent = TRUE
+      urls <- c(
+        "https://fn.no/om-fn/fns-baerekraftsmaal/utrydde-fattigdom",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/utrydde-sult",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/god-helse-og-livskvalitet",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/god-utdanning",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/likestilling-mellom-kjoennene",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/rent-vann-og-gode-sanitaerforhold",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/ren-energi-til-alle",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/anstendig-arbeid-og-oekonomisk-vekst",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/industri-innovasjon-og-infrastruktur",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/mindre-ulikhet",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/baerekraftige-byer-og-lokalsamfunn",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/ansvarlig-forbruk-og-produksjon",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/stoppe-klimaendringene",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/livet-i-havet",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/livet-paa-land",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/fred-rettferdighet-og-velfungerende-institusjoner",
+        "https://fn.no/om-fn/fns-baerekraftsmaal/samarbeid-for-aa-naa-maalene"
       )
 
-      sdg.urls <- httr.get$data |>
-        rvest::read_html() |>
-        rvest::html_nodes(".header_gols_content_list li a") |>
-        rvest::html_attr('href') |>
-        (\(x) paste0("https://www.fn.no", x)[sdgs])()
+      sdg.urls <- paste0(urls, "?lang=", sdg.lang)
 
     } else {
 
