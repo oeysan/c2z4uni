@@ -58,11 +58,10 @@ supported.lang <- c("nn", "nb", "en")
 ################################################################################
 
 #' @title DictLoad
-#' @description Loads a JSON dictionary for the given language and stores it in a mutable environment.
 #' @keywords internal
 #' @noRd
 DictLoad <- function(lang = "nn", pkgname) {
-  # Build the path to the JSON file (instead of CSV)
+  # Build the path to the JSON file
   json.file <- system.file(
     "extdata/i18n",
     paste0(lang, ".json"),
@@ -81,9 +80,6 @@ DictLoad <- function(lang = "nn", pkgname) {
 }
 
 #' @title Dict
-#' @description Retrieves a translated string from the loaded dictionary.
-#'              If the translation is a list (e.g., handling singular/plural forms),
-#'              Numerus is used to determine the correct form.
 #' @keywords internal
 #' @noRd
 Dict <- function(x = NULL,

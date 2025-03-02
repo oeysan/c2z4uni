@@ -1,9 +1,12 @@
 {
   "abstract_text": "Vitskapeleg samandrag",
+  "abstract": "Samandrag",
   "about_pub": "Om",
+  "affiliation": "Affiliert",
   "keywords": "Emneord",
   "contributors_text": "Medverkande",
-  "archive_text": "Arkiv", 
+  "contributors": "Medverkande",
+  "archive_text": "Arkiv",
   "copiedToClipboard": "Kopiert til utklippstavla",
   "fullscreen": "Fullskjerm",
   "publication": {
@@ -12,10 +15,11 @@
   },
   "of_total": "av",
   "windowed": "Vindauge",
-  "archive": "Arkivet",
+  "archive": "Arkiv",
   "search": "Søk",
   "show_all": "Vis alle",
-  "read_more": "Vis fleire", 
+  "read_more": "Vis fleire",
+  "readmore": "Les meir",
   "allYears": "Alle år",
   "allMonths": "Alle månadar",
   "month_1": "januar",
@@ -40,6 +44,11 @@
   "collection-level2": "Fakultet, administrasjon",
   "collection-level3": "Institutt, senter",
   "collection-level4": "Forskargruppe",
+  "webpage": "Nettside",
+  "email.subject": "Registrerte publikasjonar i Cristin (%s, %s)",
+  "email.header": "Dette dokumentet inneheld registrerte publikasjonar i Cristin ved %1$s for %2$s %3$s. Arkivet er tilgjengeleg på <a href=\"%4$s\">%4$s</a>. Kvar publikasjon er oppført med direktelenkje til arkivet, der ein kan finne meir informasjon om publikasjonen (e.g., samandrag, medverkande og PDF dersom dette er tilgjengeleg).",
+  "c2z": "CRIStin Bot nyttar seg av",
+  "inn.url": "https://www.inn.no/finn-en-ansatt/",
   "sdg": "Berekraftsmål",
   "sdg1": "Mål 1: Utrydde fattigdom",
   "sdg2": "Mål 2: Utrydde svolt",
@@ -57,5 +66,6 @@
   "sdg14": "Mål 14: Livet i havet",
   "sdg15": "Mål 15: Livet på land",
   "sdg16": "Mål 16: Fred, rettferd og velfungerande institusjonar",
-  "sdg17": "Mål 17: Samarbeid for å nå måla"
+  "sdg17": "Mål 17: Samarbeid for å nå måla",
+  "sdg.publications": "Publikasjonar om berekraftsmål"
 }

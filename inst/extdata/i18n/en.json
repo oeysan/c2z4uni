@@ -1,21 +1,25 @@
 {
   "abstract_text": "Scientific Abstract",
+  "abstract": "Scientific abstract",
   "about_pub": "About",
+  "affiliation": "Affiliated",
   "keywords": "Keywords",
   "contributors_text": "Contributors",
-  "archive_text": "Arkiv", 
+  "contributors": "Contributors",
+  "archive_text": "Archive",
   "copiedToClipboard": "Copied to clipboard",
   "fullscreen": "Full screen",
   "publication": {
-      "one": "publication",
-      "other": "publications"
+    "one": "publication",
+    "other": "publications"
   },
   "of_total": "of",
   "windowed": "Windowed",
-  "archive": "The Archive",
+  "archive": "Archive",
   "search": "Search",
   "show_all": "Show all",
-  "read_more": "Read more", 
+  "read_more": "Read more",
+  "readmore": "Read More",
   "allYears": "All years",
   "allMonths": "All months",
   "month_1": "January",
@@ -40,6 +44,11 @@
   "collection-level2": "Faculty, administration",
   "collection-level3": "Department, centre",
   "collection-level4": "Research groups",
+  "webpage": "Webpage",
+  "email.subject": "Registered publications in cristin (%s, %s)",
+  "email.header": "This document contains registered publications in cristin from %1$s for %2$s %3$s. The archive is located at <a href=\"%4$s\">%4$s</a>. Each publication is listed with a direct link to the location in the archive with more information (e.g., abstract, contributors and PDF if available).",
+  "c2z": "CRIStin Bot is powered by",
+  "inn.url": "https://www.inn.no/english/find-an-employee/",
   "sdg": "Sustainable Development Goals",
   "sdg1": "Goal 1: No poverty",
   "sdg2": "Goal 2: Zero hunger",
@@ -57,6 +66,12 @@
   "sdg14": "Goal 14: Life below water",
   "sdg15": "Goal 15: Life in Land",
   "sdg16": "Goal 16: Peace, Justice and strong institutions",
-  "sdg17": "Goal 17: Partnerships for the goals"
-
+  "sdg17": "Goal 17: Partnerships for the goals",
+  "sdg.publications": "Publications on Sustainable Development Goals",
+  "year": {
+    "one": "year",
+    "other": "years"
+  },
+  "n.publications": "Average number of publications per month",
+  "selection": "What do you want to examine?"
 }
