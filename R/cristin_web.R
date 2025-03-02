@@ -118,7 +118,7 @@ CristinWeb <- function(monthlies,
           ~ paste(.x, collapse = ", "))
       ) |>
       dplyr::pull(keywords) |>
-      GoFish(type == "")
+      GoFish(type = "")
     if (keywords != "") {
       keywords <- htmltools::tags$article(
         htmltools::h1(Dict("keywords", lang)),
@@ -323,6 +323,7 @@ CristinWeb <- function(monthlies,
 
     return (md)
   }
+
 
   # Markdownlist
   markdowns <- list()
