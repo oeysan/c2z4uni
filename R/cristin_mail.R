@@ -1,7 +1,7 @@
 #' @title Create HTML Email Content from Cristin Data
 #' @description This function generates HTML content for an email using data
 #' from Cristin.
-#' @param unit.key The key of the unit for which the email content is generated.
+#' @param unit.id The key of the unit for which the email content is generated.
 #' @param cristin.monthly Data containing monthly information from Cristin.
 #' @param archive.host Host of the archive.
 #' @param subject The subject of the email. If not provided, it will be
@@ -23,17 +23,19 @@
 #' @param silent c2z is noisy, tell it to be quiet, Default: FALSE
 #' @examples
 #' \donttest{
-#'   # Create monthlies for unit 209.5.10.0
 #'   example <- CristinMonthly(
 #'     c2z::Zotero(
 #'       id = "4827927",
 #'       api = "RqlAmlH5l1KPghfCseAq1sQ1",
 #'       user = FALSE
 #'     ),
-#'     unit.key = "209.5.10.0",
+#'     unit.id = "209.5.10.0",
 #'     start.date = "2023-07",
 #'     post = TRUE,
-#'     silent = FALSE
+#'     silent = FALSE,
+#'     use.identifiers = FALSE,
+#'     get.unpaywall = FALSE,
+#'     get.ezproxy = FALSE
 #'   )
 #'
 #'   # Create HTML email
@@ -46,7 +48,7 @@
 #' }
 #' @rdname CristinMail
 #' @export
-CristinMail <- \(unit.key,
+CristinMail <- \(unit.id,
                  cristin.monthly,
                  archive.host,
                  subject = NULL,
@@ -98,7 +100,7 @@ CristinMail <- \(unit.key,
   bib <- monthlies |>
     dplyr::filter(
       grepl(
-        dplyr::filter(unit.paths, id == unit.key)$key,
+        dplyr::filter(unit.paths, id == unit.id)$key,
         collections)
     ) |>
     dplyr::group_split(year.month) |>
@@ -188,7 +190,7 @@ CristinMail <- \(unit.key,
       Dict("email.header", lang),
       ToString(AncestorPath(
         unit.paths,
-        dplyr::filter(unit.paths, id == unit.key)$key,
+        dplyr::filter(unit.paths, id == unit.id)$key,
         name = TRUE
       )),
       tolower(Month(bib$month[[1]], lang = lang)),

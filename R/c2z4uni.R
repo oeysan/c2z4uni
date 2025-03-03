@@ -122,11 +122,74 @@ Dict <- function(x = NULL,
   }
 
   # Convert the string to lower case if requested
-  if (to.lower && !is.null(string)) {
+  if (to.lower & !is.null(string)) {
     string <- tolower(string)
   }
 
   return(string)
+}
+
+#' @title LocalStorage
+#' @keywords internal
+#' @noRd
+LocalStorage <- \(name,
+                  storage,
+                  data = NULL,
+                  lang = NULL,
+                  message = NULL,
+                  silent = FALSE) {
+
+
+  if (is.null(name) | is.null(storage)) return (data)
+
+  # Visible bindings
+  log <- NULL
+
+  if (!is.null(lang)) name <- paste0(name, "_", lang)
+  filename <- paste0(name, ".rds")
+  filepath <- file.path(storage, filename)
+
+  # Return NULL if storage does not exist
+  if (!file.exists(storage)) {
+    warning(sprintf("Folder '%s' not found.", storage))
+    return (data)
+  }
+  # Return NULL if file does not exist and data is NULL
+  if (!file.exists(filepath) & is.null(data)) {
+    warning(sprintf("File '%s' not found.", filepath))
+    return (data)
+  }
+
+  # Log
+  if (!is.null(message)) {
+    log <-  LogCat(message, silent = silent)
+  }
+
+  if (!is.null(data)) {
+    saveRDS(data, filepath)
+  } else {
+    data <- readRDS(filepath)
+  }
+
+  return (data)
+
+}
+
+#' @title FixItems
+#' @keywords internal
+#' @noRd
+FixItems <- function(items) {
+ items <- items |>
+  AddMissing(
+    missing.names = c("dateModified", "prefix", "relations"),
+    na.type = NA_character_,
+    location = NULL
+  ) |>
+  dplyr::mutate(
+    dateModified = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  )
+
+ return (items)
 }
 
 #' @title EtALSimple
@@ -510,7 +573,7 @@ Numerus <- \(count, singularis, pluralis = NULL, prefix = TRUE) {
 #' @keywords internal
 #' @noRd
 FilePath <- \(...) {
-  Clean <- \(x) !is.null(x) && !is.na(x) && length(x) > 0 && x != ""
+  Clean <- \(x) !is.null(x) & !is.na(x) & length(x) > 0 & x != ""
   x <- Filter(Clean, Trim(c(...)))
   do.call(file.path, as.list(x))
 }
@@ -816,9 +879,11 @@ SdgInfo <- \(sdg.sum,
 #' @keywords internal
 #' @noRd
 CreateMonthlies <- \(zotero,
+                     items,
+                     bibliography,
+                     monthlies,
                      unit.paths,
                      collections,
-                     local.storage,
                      full.update,
                      lang,
                      style,
@@ -827,9 +892,9 @@ CreateMonthlies <- \(zotero,
                      log = list()) {
 
   # Visible bindings
-  new.zotero <- key <- missing.keys <- version.x <- version.y <- name <- id <-
-    cristin.id <- year <- month <- items <- bibliography <- monthlies <-
-    inn.cards <- new.keys <- where <- key <- abstractNote <- NULL
+  new.zotero <- key <- version <- version <- name <- id <-
+    cristin.id <- year <- month <- inn.cards <- new.keys <-
+    updated.keys <- where <- key <-abstractNote <- NULL
 
   # Function to enhance bibliography
   EnhanceBib <- \(items,
@@ -916,194 +981,138 @@ CreateMonthlies <- \(zotero,
 
   }
 
-  # Try to restore zotero items if local.storage is defined
-  if (!is.null(local.storage)) {
+  # Log
+  log <-  LogCat(
+    "Checking Zotero library for updates",
+    silent = silent,
+    log = log
+  )
 
-    # Items
-    items <- GoFish(
-      readRDS(file.path(local.storage, "items.rds")),
-      NULL
-    )
+  # Find keys and versions from Zotero library
+  check.items <- c2z::ZoteroGet(
+    ListValue(zotero, "collection.key", unit.paths$key[[1]]),
+    format = "versions",
+    silent = silent,
+    append.items = TRUE,
+    result.type = "key",
+    force = TRUE
+  )$results
 
-    # Bibliography
-    bibliography <- GoFish(
-      readRDS(
-        file.path(local.storage, paste0("bibliography_", lang, ".rds"))
-      ),
-      NULL
-    )
+  # Return if no collections
+  if (!any(nrow(check.items))) {
 
     # Log
     log <-  LogCat(
-      "Checking Zotero library for updates",
+      "Zotero library is empty!",
       silent = silent,
       log = log
     )
 
-    # Find keys and versions from Zotero library
-    check.items <- c2z::ZoteroGet(
-      ListValue(zotero, "collection.key", unit.paths$key[[1]]),
-      format = "versions",
-      silent = FALSE,
-      append.items = TRUE,
-      result.type = "key",
-      force = TRUE
-    )$results
+    # Create return.list
+    return.list <- list(
+      items = NULL,
+      bibliography = NULL,
+      monthlies = NULL,
+      updated.keys = NULL,
+      log = log
+    )
+    return(return.list)
+  }
 
-    # Remove items not found in Zotero
-    if (any(nrow(items))) {
-      items <- items |>
-        filter(key %in% check.items$key)
-    }
-    if (any(nrow(bibliography))) {
-      bibliography <- bibliography |>
-        filter(key %in% check.items$key)
-    }
+  # Set all check item keys to new keys if full update or items is empty
+  if (!any(nrow(items)) | full.update) {
+    new.keys <- unique(c(new.keys, check.items$key))
+  } else {
     # Check if there are new/modified items
     new.keys <- check.items |>
       dplyr::anti_join(items, by = c("key", "version")) |>
       dplyr::pull(key) |>
       GoFish(type = NULL)
-
-    # Check if there are keys in items that are not in bibliography
-    if (any(nrow(items)) & any(nrow(bibliography))) {
-      missing.keys <- items |>
-        dplyr::anti_join(bibliography, by = c("key", "version")) |>
-        dplyr::pull(key) |>
-        GoFish(type = NULL)
-      new.keys <- unique(c(new.keys, missing.keys))
-    }
-
-    # Set new keys as all keys in zotero if no items
-    if (!any(nrow(items)) & any(nrow(check.items))) {
-      new.keys <- check.items$key
-    }
-    # Fetch bibliography for new items
-    if (any(length(new.keys))) {
-
-      # Save to storage
-      saveRDS(
-        new.keys,
-        file.path(local.storage, "updated_keys.rds")
-      )
-
-      # Log
-      log <-  LogCat(
-        "Creating bibliographies",
-        silent = silent,
-        log = log
-      )
-
-      # New items
-      new.zotero <- c2z::ZoteroGet(
-        zotero,
-        item.keys = new.keys,
-        item.type = "-attachment || note",
-        library.type = "data,bib,citation",
-        style = style,
-        locale = locale,
-        silent = silent,
-        force = TRUE,
-        use.collection = FALSE
-      )
-
-      # Update items
-      items <- UpdateInsert(items, new.zotero$results)
-
-      # Update bibliography
-      bibliography <- UpdateInsert(
-        bibliography, new.zotero$bibliography
-      )
-
-      # Arrange bibliography according to items
-      if (any(nrow(bibliography)) & any(nrow(items))) {
-        bibliography <- bibliography |>
-          dplyr:: arrange(match(key, items$key))
-      }
-
-    }
-
   }
 
-  # Find all items if full upgrade or zotero items are empty
-  if (full.update | is.null(items) | is.null(bibliography)) {
+  if (any(nrow(items))) {
+    items <- items |>
+      filter(key %in% check.items$key)
+  }
+  if (any(nrow(bibliography))) {
+    bibliography <- bibliography |>
+      filter(key %in% check.items$key)
+  }
+  if (any(nrow(monthlies))) {
+    monthlies <- monthlies |>
+      filter(key %in% check.items$key)
+  }
 
-    zotero <- ZoteroLibrary(
-      ListValue(zotero, "collection.key", unit.paths$key[[1]]),
+  # Check if there are keys in items that are not in bibliography
+  if (any(nrow(items)) & any(nrow(bibliography))) {
+    missing.keys <- items |>
+      dplyr::anti_join(bibliography, by = c("key", "version")) |>
+      dplyr::pull(key) |>
+      GoFish(type = NULL)
+    new.keys <- unique(c(new.keys, missing.keys))
+  } else if (!any(nrow(bibliography))) {
+    new.keys <- unique(c(new.keys, items$key))
+  }
+
+  # Check if there are keys in items that are not in monthlies
+  if (any(nrow(items)) & any(nrow(monthlies))) {
+    missing.keys <- items |>
+      dplyr::anti_join(monthlies, by = c("key", "version")) |>
+      dplyr::pull(key) |>
+      GoFish(type = NULL)
+    new.keys <- unique(c(new.keys, missing.keys))
+  } else if (!any(nrow(monthlies))) {
+    new.keys <- unique(c(new.keys, items$key))
+  }
+
+  # Fetch bibliography for new items
+  if (any(length(new.keys))) {
+
+    # Updated keys
+    updated.keys <- new.keys
+
+    # Log
+    log <-  LogCat(
+      "Creating bibliographies",
+      silent = silent,
+      log = log
+    )
+
+    # New items
+    new.zotero <- c2z::ZoteroGet(
+      zotero,
+      item.keys = new.keys,
       item.type = "-attachment || note",
       library.type = "data,bib,citation",
       style = style,
       locale = locale,
       silent = silent,
-      force = TRUE
-    )
-    items <- zotero$items
-    bibliography <- zotero$bibliography
-
-  }
-
-  # Return if no collections
-  if (!any(nrow(items)) |
-      !any(nrow(bibliography))) {
-    return(zotero)
-  }
-
-  # Save zotero.items and bibliography
-  if (!is.null(local.storage)) {
-
-    # Log
-    log <-  LogCat(
-      "Saving items and bibliographies to database",
-      silent = silent,
-      log = log
+      force = TRUE,
+      use.collection = FALSE
     )
 
-    # Save to storage
-    saveRDS(
-      items,
-      file.path(local.storage, "items.rds")
-    )
-    saveRDS(
-      bibliography,
-      file.path(local.storage, paste0("bibliography_", lang, ".rds"))
-    )
+    # Update items
+    items <- UpdateInsert(items, new.zotero$results)
 
-  }
+    # Update bibliography
+    bibliography <- UpdateInsert(bibliography, new.zotero$bibliography)
 
-  # Log monthly bibliographies for Cristin
-  log <-  LogCat(
-    "Creating monthly bibliographies",
-    silent = silent,
-    log = log
-  )
+    # Arrange bibliography according to items
+    if (any(nrow(bibliography)) & any(nrow(items))) {
+      bibliography <- bibliography |>
+        dplyr:: arrange(match(key, items$key))
 
-  # Try to restore monthlies to local storage if defined
-  if (!is.null(local.storage)) {
-
-    monthlies <- GoFish(
-      readRDS(
-        file.path(local.storage, paste0("monthlies_", lang, ".rds"))
-      ),
-      NULL
-    )
-
-    missing.items <- items |>
-      dplyr::anti_join(monthlies, by = c("key", "version")) |>
-      GoFish(type = NULL)
-
-    missing.bibliography <- bibliography |>
-      dplyr::inner_join(missing.items, by = c("key", "version")) |>
-      GoFish(type = NULL)
-
-    new.keys <- unique(c(new.keys, missing.items$key))
-
-    # Update if missing items
-    if (any(nrow(missing.items))) {
+      # Log monthly bibliographies for Cristin
+      log <-  LogCat(
+        "Creating monthly bibliographies",
+        silent = silent,
+        log = log
+      )
 
       # Create monthlies for new items
       new.monthlies <- EnhanceBib(
-        missing.items,
-        missing.bibliography,
+        items,
+        bibliography,
         collections,
         unit.paths,
         silent
@@ -1113,48 +1122,14 @@ CreateMonthlies <- \(zotero,
       monthlies <- UpdateInsert(monthlies, new.monthlies)
 
     }
-
   }
-
-  # Run full update if full.update is TRUE or monthlies are missing
-  if (full.update | !any(nrow(monthlies))) {
-
-    monthlies <- EnhanceBib(
-      items,
-      bibliography,
-      collections,
-      unit.paths,
-      silent
-    )
-
-  }
-
-  # Save data to local storage if defined
-  if (!is.null(local.storage)) {
-
-    if (any(nrow(monthlies))) {
-      # Log
-      log <-  LogCat(
-        "Saving monthly bibliographies to database",
-        silent = silent,
-        log = log
-      )
-      saveRDS(
-        monthlies,
-        file.path(local.storage, paste0("monthlies_", lang, ".rds"))
-      )
-    }
-
-  }
-
-  # Define new keys
-  new.keys <- if (!is.null(local.storage)) new.keys else items$key
 
   # Create return.list
   return.list <- list(
     items = items,
+    bibliography = bibliography,
     monthlies = monthlies,
-    updated.keys = new.keys,
+    updated.keys = updated.keys,
     log = log
   )
 
@@ -1165,106 +1140,69 @@ CreateMonthlies <- \(zotero,
 #' @title CreateSdgs
 #' @keywords internal
 #' @noRd
-CreateSdgs <- \(monthlies,
+CreateSdgs <- \(items,
+                sdg,
                 sdg.host,
                 sdg.batch,
-                local.storage,
                 full.update,
                 lang,
                 silent,
                 log = list()) {
 
   # Visible bindings
-  sdg <- new.items <- missing.items <- where <- key <- title <- itemType <-
+  new.items <- where <- key <- title <- itemType <-
     abstractNote <- extra <- cristin.id <- prefix <- ISBN <- DOI <-
-    doi <- extras <- NULL
+    doi <- extras <- updated.keys <- NULL
 
-  # Try to restore sdgs to local storage if defined
-  if (!is.null(local.storage)) {
+  # Check if any missing items
+  if (any(nrow(sdg))) {
+    items <- items |>
+      dplyr::anti_join(sdg, by = c("key", "version")) |>
+      GoFish(type = NULL)
+  }
 
-    # Log SDG predictions
+  # Update sdg if missing items
+  if (any(nrow(items)) | full.update) {
     log <-  LogCat(
-      "Creating SDG predictions (this may take awhile)",
+      "Predicting SDG (this may take awhile...)",
       silent = silent,
       log = log
     )
 
-    # Check if any sdg predictions exist
-    sdg <- GoFish(
-      readRDS(file.path(local.storage, "sdg_predictions.rds")),
-      NULL
-    )
+    new.sdg <- SdgPredictions(items, sdg.host, sdg.batch, silent)
+    # Update or insert items
+    sdg <- UpdateInsert(sdg, new.sdg)
+    updated.keys <- new.sdg$key
 
-    # Check if any missing items
-    missing.items <- monthlies$items |>
-      dplyr::anti_join(sdg, by = c("key", "version")) |>
-      GoFish(type = NULL)
-
-    # Update sdg if missing items
-    if (any(nrow(missing.items)) & any(nrow(sdg))) {
-      new.sdg <- SdgPredictions(missing.items, sdg.host, sdg.batch, silent)
-
-      # Update or insert sdg
-      if (any(nrow(new.sdg))) {
-        sdg <- UpdateInsert(sdg, new.sdg)
-      }
-    }
   }
 
-  # Run full sdg predictions if full update or sdg are empty
-  if ((full.update | !any(nrow(sdg))) & !is.null(sdg.host)) {
-    sdg <- SdgPredictions(monthlies$items, sdg.host, sdg.batch, silent)
-  }
+  # Sort SDGs tibble
+  sdg <- sdg |>
+    dplyr::select(key, version, dplyr::everything()) |>
+    GoFish(type = NULL)
 
-  # Save data to local storage if defined
-  if (!is.null(local.storage) & !is.null(sdg.host)) {
-
-    if (any(nrow(sdg))) {
-
-      # Sort SDGs tibble
-      sdg <- sdg |>
-        dplyr::select(key, version, dplyr::everything())
-
-      # Log
-      log <-  LogCat(
-        "Saving SDG predictions",
-        silent = silent,
-        log = log
-      )
-      saveRDS(
-        sdg,
-        file.path(local.storage, "sdg_predictions.rds")
-      )
-    }
-  }
-
-  # Create return.list
-  return.list <- list(
-    sdg = sdg,
-    log = log
-  )
-
-  return (return.list)
+  # Return list
+  return (list(predictions = sdg, updated.keys = updated.keys, log = log))
 
 }
 
 #' @title CreateExtras
 #' @keywords internal
 #' @noRd
-CreateExtras <- \(monthlies,
+CreateExtras <- \(items,
+                  extras,
                   get.unpaywall,
                   get.ezproxy,
                   ezproxy.host,
-                  local.storage,
                   full.update,
                   lang,
                   silent,
                   log = list()) {
 
   # Visible bindings
-  new.items <- missing.items <- where <- key <- title <- itemType <-
-    abstractNote <- extra <- cristin.id <- prefix <- ISBN <- DOI <-
-    doi <- extras <- NULL
+  new.items <- where <- key <- title <- itemType <-
+    abstractNote <- cristin.id <- prefix <- ISBN <- DOI <-
+    doi <- NULL
 
   # Function to enhance bibliography
   GetExtras <- \(items,
@@ -1331,75 +1269,26 @@ CreateExtras <- \(monthlies,
 
   }
 
-  # Try to restore monthlies to local storage if defined
-  if (!is.null(local.storage)) {
 
-    # Log Extras
-    log <-  LogCat(
-      "Creating extras",
-      silent = silent,
-      log = log
-    )
-
-    extras <- GoFish(
-      readRDS(
-        file.path(local.storage, "monthlies_extras.rds")
-      ),
-      NULL
-    )
-
-    # Check if any missing items
-    missing.items <- monthlies$items |>
-      dplyr::anti_join(extras, by = c("key", "version")) |>
-      GoFish(type = NULL)
-
-    # Update if new items
-    if (any(nrow(missing.items)) & any(nrow(extras))) {
-
-      # Create monthlies for new items
-      new.extras <- GetExtras(
-        missing.items,
-        get.unpaywall,
-        get.ezproxy,
-        ezproxy.host,
-        silent
-      )
-
-      # Update or insert items
-      extras <- UpdateInsert(extras, new.extras)
-
-    }
-
+  # Check if any missing items
+  if (any(nrow(extras))) {
+    items <- items |>
+      dplyr::anti_join(extras, by = c("key", "version"))
   }
 
-  # Run full update if full.update is TRUE or monthlies are missing
-  if (full.update | !any(nrow(extras))) {
+  if (any(nrow(items)) | full.update) {
 
-    extras <- GetExtras(
-      monthlies$items,
+    # Create monthlies for new items
+    new.extras <- GetExtras(
+      items,
       get.unpaywall,
       get.ezproxy,
       ezproxy.host,
       silent
     )
 
-  }
-
-  # Save data to local storage if defined
-  if (!is.null(local.storage)) {
-
-    if (any(nrow(extras))) {
-      # Log
-      log <-  LogCat(
-        "Saving extras to database",
-        silent = silent,
-        log = log
-      )
-      saveRDS(
-        extras,
-        file.path(local.storage, "monthlies_extras.rds")
-      )
-    }
+    # Update or insert items
+    extras <- UpdateInsert(extras, new.extras)
 
   }
 
@@ -3029,23 +2918,76 @@ ToString <- \(x, sep = ", ") {
 
 }
 
+#' @title AddColumns
+#' @keywords internal
+#' @noRd
+AddColumns <- function(x, y) {
+  missing.cols <- setdiff(names(y), names(x))
+  for (col in missing.cols) {
+    new.val <- if (is.factor(y[[col]])) {
+      factor(NA, levels = levels(y[[col]]))
+    } else if (is.integer(y[[col]])) {
+      NA_integer_
+    } else if (is.numeric(y[[col]])) {
+      NA_real_
+    } else if (is.character(y[[col]])) {
+      NA_character_
+    } else if (is.logical(y[[col]])) {
+      NA
+    } else {
+      NA
+    }
+    x <- dplyr::mutate(x, !!col := new.val)
+  }
+  return (x)
+}
+
+
 #' @title UpdateInsert
 #' @keywords internal
 #' @noRd
-UpdateInsert <- \(x, y, key = "key") {
-
+UpdateInsert <- function(x, y, key = "key") {
   if (!any(nrow(y))) return(x)
   if (!any(nrow(x))) return(y)
 
-  x <- dplyr::bind_rows(x, y) |>
-    dplyr::rows_update(
-      y, by = key, unmatched = "ignore"
-    ) |>
-    dplyr::distinct(!!rlang::sym(key), .keep_all = TRUE)
+  # Compute the union of all column names.
+  all.columns <- union(names(x), names(y))
+
+  # Align the two data frames by adding missing columns using the reference data frame.
+  if (length(names(x)) < length(names(y))) {
+    x <- AddColumns(x, y)  # x is missing columns that are in y.
+  } else if (length(names(y)) < length(names(x))) {
+    y <- AddColumns(y, x)  # y is missing columns that are in x.
+  }
+
+  # Reorder both data frames to have the same column order.
+  x <- dplyr::select(x, dplyr::all_of(all.columns))
+  y <- dplyr::select(y, dplyr::all_of(all.columns))
+
+  # Align common columns' types: convert y's columns to match the types in x.
+  common.cols <- intersect(names(x), names(y))
+  for (col in common.cols) {
+    if (!identical(class(x[[col]]), class(y[[col]]))) {
+      if (is.logical(x[[col]])) {
+        y[[col]] <- as.logical(y[[col]])
+      } else if (is.numeric(x[[col]])) {
+        y[[col]] <- as.numeric(y[[col]])
+      } else if (is.integer(x[[col]])) {
+        y[[col]] <- as.integer(y[[col]])
+      } else if (is.character(x[[col]])) {
+        y[[col]] <- as.character(y[[col]])
+      } else if (is.factor(x[[col]])) {
+        y[[col]] <- factor(y[[col]], levels = levels(x[[col]]))
+      }
+    }
+  }
+
+  # Perform the upsert: update matching rows (by key) and insert new rows.
+  x <- dplyr::rows_upsert(x, y, by = key)
 
   return(x)
-
 }
+
 
 #' @title AddMissing
 #' @keywords internal

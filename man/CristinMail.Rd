@@ -5,7 +5,7 @@
 \title{Create HTML Email Content from Cristin Data}
 \usage{
 CristinMail(
-  unit.key,
+  unit.id,
   cristin.monthly,
   archive.host,
   subject = NULL,
@@ -20,7 +20,7 @@ CristinMail(
 )
 }
 \arguments{
-\item{unit.key}{The key of the unit for which the email content is generated.}
+\item{unit.id}{The key of the unit for which the email content is generated.}
 
 \item{cristin.monthly}{Data containing monthly information from Cristin.}
 
@@ -62,17 +62,19 @@ HTML format for email of selected units
 }
 \examples{
 \donttest{
-  # Create monthlies for unit 209.5.10.0
   example <- CristinMonthly(
     c2z::Zotero(
       id = "4827927",
       api = "RqlAmlH5l1KPghfCseAq1sQ1",
       user = FALSE
     ),
-    unit.key = "209.5.10.0",
+    unit.id = "209.5.10.0",
     start.date = "2023-07",
     post = TRUE,
-    silent = FALSE
+    silent = FALSE,
+    use.identifiers = FALSE,
+    get.unpaywall = FALSE,
+    get.ezproxy = FALSE
   )
 
   # Create HTML email

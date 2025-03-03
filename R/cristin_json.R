@@ -26,7 +26,7 @@
 #'       api = "RqlAmlH5l1KPghfCseAq1sQ1",
 #'       user = FALSE
 #'     ),
-#'     unit.key = "209.5.10.0",
+#'     unit.id = "209.5.10.0",
 #'     start.date = "2023-07",
 #'     post = TRUE,
 #'     silent = TRUE
@@ -68,6 +68,7 @@ CristinJson <- \(cristin.monthly,
   # Define menu and link items
   menu <- tibble::tibble(
     startYear = min(monthlies$year),
+    sdgs = list(cristin.monthly$sdg.summary$sum),
     endYear = max(monthlies$year),
     nCollections = max(unit.paths$level),
     type = list(unique(monthlies$type)),
@@ -91,7 +92,7 @@ CristinJson <- \(cristin.monthly,
     )
 
   # Update user info @ inn if user.cards = TRUE
-  if (user.cards) {
+  if (user.cards & !is.null(local.storage)) {
     inn.cards <- GetCards(local.storage, full.update, lang, silent)
   } # End user.cards
 

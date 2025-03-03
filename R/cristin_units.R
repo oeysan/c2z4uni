@@ -3,7 +3,7 @@
 #'  (e.g., A University -> Faculties -> Departments -> Groups). The tibble can
 #'  than be used to extract data for each unit from Cristin. Used by
 #'  `CristinMonthly`
-#' @param unit.key Unit to search for
+#' @param unit.id Unit to search for
 #' @param subunits Add subunits, Default: TRUE
 #' @param recursive Search for (nested) sub-units, Default: FALSE
 #' @param ancestors Search for parent units, Default: FALSE
@@ -24,7 +24,7 @@
 #'  \code{\link[purrr]{pmap}}
 #' @rdname CristinUnits
 #' @export
-CristinUnits <- \(unit.key,
+CristinUnits <- \(unit.id,
                   subunits = TRUE,
                   recursive = FALSE,
                   ancestors = FALSE,
@@ -47,7 +47,7 @@ CristinUnits <- \(unit.key,
   httr.get <- Online(
     httr::RETRY(
       "GET",
-      sprintf("https://api.cristin.no/v2/units/%s/", unit.key),
+      sprintf("https://api.cristin.no/v2/units/%s/", unit.id),
       query = list(lang = lang),
       quiet = TRUE
     ),

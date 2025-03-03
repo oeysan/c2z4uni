@@ -6,7 +6,7 @@
 \usage{
 CristinMonthly(
   zotero,
-  unit.key,
+  unit.id,
   unit.recursive = TRUE,
   sdg.host = NULL,
   sdg.batch = 20,
@@ -36,7 +36,7 @@ CristinMonthly(
 \arguments{
 \item{zotero}{What Zotero library to use}
 
-\item{unit.key}{What unit to search for}
+\item{unit.id}{What unit to search for}
 
 \item{unit.recursive}{Find subunits of defined unit key, Default: TRUE}
 
@@ -117,7 +117,7 @@ selected units
       api = "RqlAmlH5l1KPghfCseAq1sQ1",
       user = FALSE
     ),
-    unit.key = "209.5.10.0",
+    unit.id = "209.5.10.0",
     start.date = "2023-07",
     post = TRUE,
     silent = TRUE

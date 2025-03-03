@@ -3,7 +3,7 @@
 #' From either a specified unit or a set of units (e.g., A University ->
 #' Faculties -> Departments -> Groups).
 #' @param zotero What Zotero library to use
-#' @param unit.key What unit to search for
+#' @param unit.id What unit to search for
 #' @param unit.recursive Find subunits of defined unit key, Default: TRUE
 #' @param sdg.host host conducting SDG predictions, Default: NULL
 #' @param sdg.batch The batch size for each API call to the SDG host, specifying
@@ -50,7 +50,7 @@
 #'       api = "RqlAmlH5l1KPghfCseAq1sQ1",
 #'       user = FALSE
 #'     ),
-#'     unit.key = "209.5.10.0",
+#'     unit.id = "209.5.10.0",
 #'     start.date = "2023-07",
 #'     post = TRUE,
 #'     silent = TRUE
@@ -79,7 +79,7 @@
 #' @rdname CristinMonthly
 #' @export
 CristinMonthly <- \(zotero,
-                    unit.key,
+                    unit.id,
                     unit.recursive = TRUE,
                     sdg.host = NULL,
                     sdg.batch = 20,
@@ -112,7 +112,8 @@ CristinMonthly <- \(zotero,
     destination.key <- lang.month <- bib <- bib.body <- bib.web <- abstract <-
     new.keys <- examine.items <- monthlies <- version.x <-
     version.y <- log.eta <- id <- multidepartmental <-
-    duplicates <- extras <- cristin.id <- items <- collections <- NULL
+    duplicates <- extras <- cristin.id <- items <- collections <-
+    updated.keys <- col.lang <- sdg <- sdg.summary <- NULL
 
   # Languages
   # Set lang as nn if no
@@ -122,7 +123,7 @@ CristinMonthly <- \(zotero,
 
   # Define units
   units <- CristinUnits(
-    unit.key,
+    unit.id,
     recursive = unit.recursive,
     lang = post.lang
   )
@@ -140,14 +141,12 @@ CristinMonthly <- \(zotero,
   n.paths <- ncol(dplyr::select(units, dplyr::starts_with("path")))+2
 
   # Try to restore collections if local.storage is TRUE
-  if (!is.null(local.storage)) {
-
-    collections <- GoFish(
-      readRDS(file.path(local.storage, "collections.rds")),
-      NULL
-    )
-
-  }
+  collection <- LocalStorage(
+    "collections",
+    local.storage,
+    message = "Loading Collections",
+    silent = silent
+  )
 
   # Search collections if collections are empty
   if (full.update | is.null(collections)) {
@@ -208,23 +207,14 @@ CristinMonthly <- \(zotero,
 
     # Add period date to units data
     post.data <- tidyr::crossing(units, period)
-
     # Try to restore post data if local.storage is TRUE
-    if (!is.null(local.storage)) {
-
-      old.data <- GoFish(
-        readRDS(file.path(local.storage, "post_data.rds")),
-        NULL
+    old.data <- LocalStorage("post_data", local.storage)
+    if (any(nrow(old.data))) {
+      post.data <- dplyr::anti_join(
+        post.data,
+        old.data,
+        join_by(id, start.date, end.date)
       )
-
-      if (any(nrow(old.data))) {
-        post.data <- dplyr::anti_join(
-          post.data,
-          old.data,
-          join_by(id, start.date, end.date)
-        )
-      }
-
     }
 
     # Log
@@ -285,18 +275,14 @@ CristinMonthly <- \(zotero,
     post.data$path <- paths
 
     # Save post.data if local.storage is defined
-    if (!is.null(local.storage)) {
+    # Combine old and new data
+    post.data <- dplyr::bind_rows(old.data, post.data)
 
-      # Combine old and new data
-      post.data <- dplyr::bind_rows(old.data, post.data)
+    # Save post.data
+    post.data <- LocalStorage("post_data", local.storage, post.data)
 
-      # Save post.data
-      saveRDS(post.data, file.path(local.storage, "post_data.rds"))
-
-      # Save collections
-      saveRDS(collections, file.path(local.storage, "collections.rds"))
-
-    }
+    # Save collections
+    collections <- LocalStorage("collections", local.storage, collections)
 
     # use filter if use.filter = TRUE
     if (use.filter) {
@@ -317,14 +303,12 @@ CristinMonthly <- \(zotero,
     }
 
     # Try to restore zotero items if local.storage is defined
-    if (!is.null(local.storage)) {
-
-      zotero$items <- GoFish(
-        readRDS(file.path(local.storage, "items.rds")),
-        NULL
-      )
-
-    }
+    zotero$items <- LocalStorage(
+      "items",
+      local.storage,
+      message = "Loading items",
+      silent = silent
+    )
 
     # Run full update if full.update is TRUE or duplicate check is empty
     if (full.update | is.null(zotero$items) & !is.null(collections)) {
@@ -346,21 +330,6 @@ CristinMonthly <- \(zotero,
           force = TRUE,
           log = zotero$log
         )
-      }
-
-      # Save items if local.storage is defined
-      if (!is.null(local.storage) & !is.null(zotero$items)) {
-
-        # Log
-        zotero$log <-  LogCat(
-          "Saving items",
-          silent = silent,
-          log = zotero$log
-        )
-
-        # Save items
-        saveRDS(zotero$items, file.path(local.storage, "items.rds"))
-
       }
     }
 
@@ -457,7 +426,8 @@ CristinMonthly <- \(zotero,
       }
 
       # Update items
-      zotero$items <- examine.items$items
+      item <- examine.items$items
+      zotero$items <- items
 
       # Remove collections not found in Cristin query
       zotero$collections <- collections |>
@@ -469,44 +439,56 @@ CristinMonthly <- \(zotero,
     } # End add items
 
     # Define updated collections
-    if (!is.null(zotero$collections)) {
+    if (any(nrow(zotero$collections))) {
 
       # Update collections
-      collections <- AddMissing(collections, "prefix", NA_character_) |>
-        dplyr::rows_update(
-          zotero$collections,
-          by = "key",
-          unmatched = "ignore"
-        ) |>
-        dplyr::distinct(key, .keep_all = TRUE)
+      collections <- UpdateInsert(collections, zotero$collections)
 
       # Save collections if local.storage is defined
-      if (!is.null(local.storage)) {
+      collections <- LocalStorage(
+        "collections",
+        local.storage,
+        collections,
+        message = "Saving collections",
+        silent = silent
+      )
 
-        # Log
-        zotero$log <-  LogCat(
-          "Saving collections",
-          silent = silent,
-          log = zotero$log
-        )
-
-        # Save items
-        saveRDS(collections, file.path(local.storage, "collections.rds"))
-
-      }
+      # Update Zotero list
+      zotero$collections <- collections |>
+        dplyr::filter(version > 0) |>
+        dplyr::distinct(key, .keep_all = TRUE)
 
     }
 
-    # Update Zotero list
-    zotero$items <- items
-    zotero$collections <- collections |>
-      dplyr::filter(version > 0) |>
-      dplyr::distinct(key, .keep_all = TRUE)
+    # Define updated collections
+    if (any(nrow(items))) {
 
-    # Return Zotero list if post.only is TRUE
+      items <- FixItems(UpdateInsert(items, zotero$items))
+      zotero$items <- LocalStorage(
+        "items",
+        local.storage,
+        items,
+        message = "Saving items",
+        silent = silent
+      )
+
+      updated.keys <- LocalStorage(
+        "updated.keys",
+        local.storage,
+        items$key,
+        lang = lang,
+        message = "Saving updated keys",
+        silent = silent
+      )
+
+
+    }
+
+        # Return Zotero list if post.only is TRUE
     if (post.only) return (zotero)
 
   } # End post
+
 
   # Remove collections with no items
   collections  <- collections  |>
@@ -520,7 +502,7 @@ CristinMonthly <- \(zotero,
 
   # Find all ancestors of defined unit key
   units <- CristinUnits(
-    unit.key,
+    unit.id,
     recursive = unit.recursive,
     ancestors = TRUE,
     lang = post.lang
@@ -576,113 +558,255 @@ CristinMonthly <- \(zotero,
   }
 
   # Save unit paths if local storage is defined
-  if (!is.null(local.storage)) {
-    saveRDS(
-      unit.paths,
-      file.path(local.storage, paste0("unit_paths_", lang, ".rds"))
+  unit.paths <- LocalStorage(
+    "unit_paths",
+    local.storage,
+    unit.paths,
+    lang = lang,
+    message = "Saving unit paths",
+    silent = silent
+  )
+
+  # Return NULL if no unit paths.
+  if (!any(nrow(unit.paths))) {
+    # Log
+    log <-  LogCat(
+      "Zotero library is empty!",
+      silent = silent,
+      log = log
     )
+    return (NULL)
   }
 
   # Create Monthlies
+  # Loading items, bibliography and monthlies
+  items <- LocalStorage("items", local.storage)
+  bibliography <- LocalStorage("bibliography", local.storage, lang = lang)
+  monthlies <- LocalStorage("monthlies", local.storage, lang = lang)
+
+  # Creating monthlies
   monthlies <- CreateMonthlies(
-    zotero,
-    unit.paths,
-    collections,
-    local.storage,
-    full.update,
-    lang,
-    style,
-    locale,
-    silent,
+    zotero = zotero,
+    items = items,
+    bibliography = bibliography,
+    monthlies = monthlies,
+    unit.paths = unit.paths,
+    collections = collections,
+    full.update = full.update,
+    lang = lang,
+    style = style,
+    locale = locale,
+    silent = silent,
     log = zotero$log
   )
 
-  # Create extras if any monthlies
-  if (any(nrow(monthlies$items))) {
+  log <- monthlies$log
+  # Updated keys
+  updated.keys <- monthlies$updated.keys
+
+  # Saving items, bibliography and monthlies
+  items <- LocalStorage(
+    "items",
+    local.storage,
+    monthlies$items,
+    message = "Saving items",
+    silent = silent
+  )
+  bibliography <- LocalStorage(
+    "bibliography",
+    local.storage,
+    monthlies$bibliography,
+    lang = lang,
+    message = "Saving bibliography",
+    silent = silent
+  )
+  monthlies <- monthlies$monthlies
+
+  # Create extras if any items
+  if (any(nrow(items))) {
+
+    # Create Monthlies
+    # Loading extras
+    monthlies.extras <- LocalStorage("monthlies_extras", local.storage)
+
     extras <- CreateExtras(
-      monthlies,
-      get.unpaywall,
-      get.ezproxy,
-      ezproxy.host,
-      local.storage,
-      full.update,
-      lang,
-      silent,
-      log = monthlies$log
+      items = items,
+      extras = monthlies.extras,
+      get.unpaywall = get.unpaywall,
+      get.ezproxy = get.ezproxy,
+      ezproxy.host = ezproxy.host,
+      full.update = full.update,
+      lang = lang,
+      silent = silent,
+      log = log
     )
+
+    log <- extras$log
+    # Updated keys
+    updated.keys <- c(updated.keys, extras$updated.keys)
+
+    extras <- LocalStorage(
+      "monthlies_extras",
+      local.storage,
+      extras$extras,
+      message = "Saving extras",
+      silent = silent
+    )
+
   }
 
-  # Create SDGs if any monthlies
-  if (any(nrow(monthlies$items))) {
+  # Create SDGs if any items
+  if (any(nrow(items)) & !is.null(sdg.host)) {
+    # Loading SDG Predictions
+    sdg <- LocalStorage(
+      "sdg_predictions",
+      local.storage,
+      message = "Loading SDG Predictions",
+      silent = silent
+    )
+
+    # Creating SDG Predictions
     sdg <- CreateSdgs(
-      monthlies,
-      sdg.host,
-      sdg.batch,
+      items = items,
+      sdg = sdg,
+      sdg.host = sdg.host,
+      sdg.batch = sdg.batch,
+      full.update = full.update,
+      lang = lang,
+      silent = silent,
+      log = log
+    )
+
+    # Saving log
+    log <- sdg$log
+    # Updated keys
+    updated.keys <- c(updated.keys, sdg$updated.keys)
+
+    # Saving SDG Predictions
+    sdg <- LocalStorage(
+      "sdg_predictions",
       local.storage,
-      full.update,
-      lang,
-      silent,
-      log = extras$log
+      sdg$predictions,
+      message = "Saving SDG Predictions",
+      silent = silent
     )
   }
 
-  # Find multidepartmental and duplicate items
-  if (check.items & any(nrow(monthlies$items))) {
+  # Find multi-departmental and duplicate items
+  if (check.items & any(nrow(items))) {
 
     # Log examine items
-    sdg$log <-  LogCat(
-      "Searching for duplicates and multidepartmental publications",
+    log <-  LogCat(
+      "Searching for duplicates and multi-departmental publications",
       silent = silent,
-      log = sdg$log
+      log = log
     )
 
     examine.items <- ExamineItems(
-      monthlies$items,
+      items,
       collections,
       silent,
-      sdg$log,
+      log,
       n.paths
     )
+    log <- examine.items$log
     multidepartmental <- examine.items$multidepartmental
     duplicates <- examine.items$duplicates
   }
 
-  # Join monthlies and extras
-  if (any(nrow(monthlies$monthlies)) & any(nrow(extras$extras))) {
-    monthlies$monthlies <- monthlies$monthlies |>
-      dplyr::left_join(extras$extras, by = "key", suffix = c("", ".remove")) |>
+  # Define updated keys.
+  updated.keys <- LocalStorage(
+    "updated.keys",
+    local.storage,
+    updated.keys,
+    lang = lang,
+    message = "Saving updated keys",
+    silent = silent
+  )
+
+  # Finalize monthlies
+  if (any(nrow(monthlies)) & any(nrow(extras))) {
+    monthlies <- monthlies |>
+      dplyr::left_join(
+        extras,
+        by = join_by(key, version),
+        suffix = c("", ".remove")) |>
       dplyr::select(-c(dplyr::ends_with(".remove")))
   }
 
-  # Add SDG if sdg.model is defined
-  if (any(nrow(monthlies$monthlies)) & any(nrow(sdg$sdg))) {
-
+  if (any(nrow(monthlies)) & any(nrow(sdg))) {
     col.lang <- if (lang == "en") "" else paste0("_", lang)
-    sdgs <- sdg$sdg |>
-      dplyr::select(
-        key,
-        version,
-        sdg = llm_sdgs_final,
-        research.field = !!sym(paste0("llm_keywords", col.lang)),
-        research.type = !!sym(paste0("llm_research_type", col.lang)),
-        research.design = !!sym(paste0("llm_research_design", col.lang)),
-        theories = !!sym(paste0("llm_theories", col.lang)),
-        synopsis = !!sym(paste0("llm_synopsis", col.lang)),
-        keywords = !!sym(paste0("llm_keywords", col.lang))
-      )
-    monthlies$monthlies <- monthlies$monthlies |>
-      dplyr::left_join(sdgs, by = c("key", "version"))
+    monthlies <- monthlies |>
+      dplyr::left_join(
+        sdg |>
+          dplyr::select(
+            key,
+            version,
+            sdg = llm_sdgs_final,
+            research.field = !!sym(paste0("llm_keywords", col.lang)),
+            research.type = !!sym(paste0("llm_research_type", col.lang)),
+            research.design = !!sym(paste0("llm_research_design", col.lang)),
+            theories = !!sym(paste0("llm_theories", col.lang)),
+            synopsis = !!sym(paste0("llm_synopsis", col.lang)),
+            keywords = !!sym(paste0("llm_keywords", col.lang))
+          ),
+        by = join_by(key, version),
+        suffix = c("", ".remove")) |>
+      dplyr::select(-c(dplyr::ends_with(".remove")))
+  }
+
+  monthlies <- LocalStorage(
+    "monthlies",
+    local.storage,
+    monthlies,
+    lang = lang,
+    message = "Saving monthlies",
+    silent = silent
+  )
+
+  unit.key <- unit.paths |>
+    dplyr::filter(id == unit.id) |>
+    dplyr::pull(key)
+  if (any(nrow(items))) {
+    items <- items |>
+      dplyr::filter(purrr::map2_lgl(unit.key, collections, ~ .x %in% .y))
+  }
+  if (any(nrow(bibliography))) {
+    bibliography <- bibliography |>
+      dplyr::semi_join(items, by = c("key", "version"))
+  }
+  if (any(nrow(monthlies))) {
+    monthlies <- monthlies |>
+      dplyr::semi_join(items, by = c("key", "version"))
+  }
+  if (any(nrow(sdg))) {
+    sdg <- sdg |>
+      dplyr::semi_join(items, by = c("key", "version"))
+  }
+
+  # Create SDG Summary
+  if (any(nrow(sdg))) {
+    sdg.summary <- LocalStorage(
+      "sdg_predictions_summary",
+      local.storage,
+      SdgSummary(sdg),
+      message = "Creating SDG Summary",
+      silent = silent
+    )
   }
 
   # Create return.list
   return.list <- list(
     unit.paths = unit.paths,
-    monthlies =  monthlies$monthlies,
-    sdg = sdg$sdg,
-    updated.keys = monthlies$updated.keys,
+    items = items,
+    bibliography = bibliography,
+    monthlies =  monthlies,
+    sdg = sdg,
+    sdg.summary = sdg.summary,
+    updated.keys = updated.keys,
     multidepartmental = multidepartmental,
     duplicates = duplicates,
-    log = examine.items$log
+    log = log
   )
 
   return(return.list)

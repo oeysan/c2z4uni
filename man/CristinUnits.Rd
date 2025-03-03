@@ -5,7 +5,7 @@
 \title{create a tibble with information about selected Cristin units}
 \usage{
 CristinUnits(
-  unit.key,
+  unit.id,
   subunits = TRUE,
   recursive = FALSE,
   ancestors = FALSE,
@@ -13,7 +13,7 @@ CristinUnits(
 )
 }
 \arguments{
-\item{unit.key}{Unit to search for}
+\item{unit.id}{Unit to search for}
 
 \item{subunits}{Add subunits, Default: TRUE}
 
