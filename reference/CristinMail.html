@@ -18,7 +18,7 @@ from Cristin."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/li
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9040</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9041</span>
       </span>
     </div>
 
@@ -56,7 +56,7 @@ from Cristin.</p>
 
     <div id="ref-usage">
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">CristinMail</span><span class="op">(</span></span>
-<span>  <span class="va">unit.key</span>,</span>
+<span>  <span class="va">unit.id</span>,</span>
 <span>  <span class="va">cristin.monthly</span>,</span>
 <span>  <span class="va">archive.host</span>,</span>
 <span>  subject <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -75,7 +75,7 @@ from Cristin.</p>
     <h2>Arguments</h2>
 
 
-<dl><dt id="arg-unit-key">unit.key<a class="anchor" aria-label="anchor" href="#arg-unit-key"></a></dt>
+<dl><dt id="arg-unit-id">unit.id<a class="anchor" aria-label="anchor" href="#arg-unit-id"></a></dt>
 <dd><p>The key of the unit for which the email content is generated.</p></dd>
 
 
@@ -141,17 +141,19 @@ HTML format for email of selected units</p>
     <div id="ref-examples">
     <h2>Examples</h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span>  <span class="co"># Create monthlies for unit 209.5.10.0</span></span></span>
 <span class="r-in"><span>  <span class="va">example</span> <span class="op">&lt;-</span> <span class="fu"><a href="CristinMonthly.html">CristinMonthly</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>    <span class="fu">c2z</span><span class="fu">::</span><span class="fu"><a href="https://oeysan.github.io/c2z/reference/Zotero.html" class="external-link">Zotero</a></span><span class="op">(</span></span></span>
 <span class="r-in"><span>      id <span class="op">=</span> <span class="st">"4827927"</span>,</span></span>
 <span class="r-in"><span>      api <span class="op">=</span> <span class="st">"RqlAmlH5l1KPghfCseAq1sQ1"</span>,</span></span>
 <span class="r-in"><span>      user <span class="op">=</span> <span class="cn">FALSE</span></span></span>
 <span class="r-in"><span>    <span class="op">)</span>,</span></span>
-<span class="r-in"><span>    unit.key <span class="op">=</span> <span class="st">"209.5.10.0"</span>,</span></span>
+<span class="r-in"><span>    unit.id <span class="op">=</span> <span class="st">"209.5.10.0"</span>,</span></span>
 <span class="r-in"><span>    start.date <span class="op">=</span> <span class="st">"2023-07"</span>,</span></span>
 <span class="r-in"><span>    post <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>    silent <span class="op">=</span> <span class="cn">FALSE</span></span></span>
+<span class="r-in"><span>    silent <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
+<span class="r-in"><span>    use.identifiers <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
+<span class="r-in"><span>    get.unpaywall <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
+<span class="r-in"><span>    get.ezproxy <span class="op">=</span> <span class="cn">FALSE</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Searching for collections </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Found 5 collections </span>
