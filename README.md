@@ -11,12 +11,12 @@ id="logo" title="Logo">
 </p>
 <p align="center">
 <a href="https://oeysan.github.io/c2z4uni/news/index.html" id="news" 
-title="News"><img src="https://img.shields.io/badge/News-2025.03.11 @ 09:40:14-purple.svg" alt="News"/></a><br/><a 
+title="News"><img src="https://img.shields.io/badge/News-2025.03.11 @ 20:46:10-purple.svg" alt="News"/></a><br/><a 
 href="https://cran.r-project.org/package=c2z4uni" id="cran" 
 title="CRAN Version"><img src="https://www.r-pkg.org/badges/version/c2z4uni" 
 alt="CRAN Version"/></a>
 <a href="https://github.com/oeysan/c2z4uni" id="github" 
-title="GitHub Version"><img src="https://img.shields.io/badge/GitHub-0.2.0.9000-orange.svg" alt="GitHub Version" /></a>
+title="GitHub Version"><img src="https://img.shields.io/badge/GitHub-0.2.0.9001-orange.svg" alt="GitHub Version" /></a>
 <br/><a href="https://oeysan.github.io/c2z4uni/LICENSE.html" id="license" 
 title="License">
 <img src="https://img.shields.io/badge/Licence-MIT-blue.svg" 

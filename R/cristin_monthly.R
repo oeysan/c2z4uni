@@ -586,7 +586,7 @@ CristinMonthly <- \(zotero,
       zotero$items <- items
 
       updated.keys <- LocalStorage(
-        "updated.keys",
+        "updated_keys",
         local.storage,
         items$key,
         lang = lang,
@@ -884,7 +884,7 @@ CristinMonthly <- \(zotero,
 
   # Define updated keys.
   updated.keys <- LocalStorage(
-    "updated.keys",
+    "updated_keys",
     local.storage,
     updated.keys,
     lang = lang,
