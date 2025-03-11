@@ -18,7 +18,7 @@ from Cristin."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/li
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0.9041</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9000</span>
       </span>
     </div>
 
@@ -156,12 +156,10 @@ HTML format for email of selected units</p>
 <span class="r-in"><span>    get.ezproxy <span class="op">=</span> <span class="cn">FALSE</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Searching for collections </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Found 5 collections </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> The Zotero list contains: 5 collections, 0 items, and 0 attachments </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Cristin query based on 1 unit from 07.2023 to 08.2023 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Creating new collections </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> —————————————————Process: 100.00% (1/1). Elapsed time: 00:00:00—————————————————</span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in c2z::Zotero(zotero = zotero, collection.key = core.location,     search.collections = FALSE, item.type = "-attachment || note",     library = TRUE, silent = silent, force = TRUE, log = zotero$log):</span> unused argument (search.collections = FALSE)</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in ProcessData({    p &lt;- progressr::progressor(steps = length(cristin.chunks))    run &lt;- future_lapply(cristin.chunks, function(chunk) {        new.items &lt;- NULL        for (i in seq_len(nrow(chunk))) {            cristin &lt;- c2z::Cristin(unit = chunk$id[[i]], created_since = start.date,                 created_before = end.date, use.identifiers = use.identifiers,                 use.multisession = use.multisession, handler = handler,                 restore.defaults = restore.defaults, filter = filter,                 force = TRUE, silent = cristin.silent, nvi = nvi,                 zotero = zotero)            if (any(nrow(cristin$results))) {                period.data &lt;- dplyr::filter(post.data, chunk$id[[i]] ==                   post.data$id)                between.results &lt;- tidyr::unnest_wider(tibble::enframe(purrr::pmap(list(period.data$start.date,                   period.data$end.date), function(start.date,                   end.date) {                  dplyr::between(cristin$created, start.date,                     end.date)                })), value, names_sep = "")                cristin$results$collections &lt;- purrr::imap(dplyr::select(between.results,                   -name), ~unname(unlist(period.data[.x, "path"])))                new.items &lt;- dplyr::bind_rows(new.items, cristin$results)            }        }        p(message = sprintf("Processing: %s.", tail(chunk$core[[i]],             1)))        return(new.items)    }, future.seed = TRUE)    dplyr::bind_rows(run)}, start.message = start.message, use.multisession = use.multisession,     restore.defaults = restore.defaults, handler = handler, silent = silent,     ):</span> could not find function "ProcessData"</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>  <span class="co"># Create HTML email</span></span></span>
 <span class="r-in"><span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/any.html" class="external-link">any</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">example</span><span class="op">$</span><span class="va">monthlies</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
