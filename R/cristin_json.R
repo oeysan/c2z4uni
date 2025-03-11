@@ -53,7 +53,21 @@ CristinJson <- \(cristin.monthly,
   # Visible bindings
   abstract <- bib.item <- key <- level <- month <- name <- parentCollection <-
     sdg <- title <- type <- year <- inn.cards <-  cristin.id <-
-    cristin.ids <- ezproxy <- unpaywall <- synopsis <- keyword <- NULL
+    cristin.ids <- ezproxy <- unpaywall <- synopsis <- keyword <-
+    research.type <- research.design <- keywords <- NULL
+
+  # Function to find contributors in Inn Cards
+  CreateContributors <- \(x, inn.cards = NULL) {
+    if (!any(nrow(inn.cards))) {
+      return (NULL)
+    }
+    inn.card <- inn.cards |>
+      dplyr::filter(cristin.id %in% x) |>
+      dplyr::arrange(match(cristin.id, x)) |>
+      dplyr::pull(cristin.id)
+    if (!any(length(inn.card))) inn.card <- NULL
+    return (inn.card)
+  }
 
   # Languages
   # Set lang as nn if no
@@ -95,19 +109,6 @@ CristinJson <- \(cristin.monthly,
   if (user.cards & !is.null(local.storage)) {
     inn.cards <- GetCards(local.storage, full.update, lang, silent)
   } # End user.cards
-
-  # Function to find contributors in Inn Cards
-  CreateContributors <- \(x, inn.cards = NULL) {
-    if (!any(nrow(inn.cards))) {
-      return (NULL)
-    }
-    inn.card <- inn.cards |>
-      dplyr::filter(cristin.id %in% x) |>
-      dplyr::arrange(match(cristin.id, x)) |>
-      dplyr::pull(cristin.id)
-    if (!any(length(inn.card))) inn.card <- NULL
-    return (inn.card)
-  }
 
   # Create items
   items <- monthlies |>

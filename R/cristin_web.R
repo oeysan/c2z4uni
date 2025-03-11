@@ -25,7 +25,7 @@
 #'   example <- CristinMonthly(
 #'     c2z::Zotero(
 #'       id = "4827927",
-#'       api = "RqlAmlH5l1KPghfCseAq1sQ1",
+#'       api = "Io1bwAiOjB1jPgUNegjJhJxF",
 #'       user = FALSE
 #'     ),
 #'     unit.id = "209.5.10.0",
@@ -61,7 +61,7 @@ CristinWeb <- function(monthlies,
                        log = list()) {
 
   # Visible bindings
-  cristin.id <- inn.cards <- NULL
+  cristin.id <- inn.cards <- research.type <- research.design <- NULL
 
   # Languages
   # Set lang as nn if no

@@ -29,6 +29,12 @@
 #'   unnest
 #' @importFrom readr
 #'   read_rds
+#' @importFrom future
+#'   plan
+#' @importFrom future.apply
+#'   future_lapply
+#' @importFrom progressr
+#'   progressor
 NULL
 #> NULL
 
@@ -47,10 +53,6 @@ NULL
   DictLoad("en", pkgname)
 }
 
-#' @title zotero.types
-#' @keywords internal
-#' @noRd
-zotero.types <- c2z::zotero.types
 supported.lang <- c("nn", "nb", "en")
 
 ################################################################################
@@ -129,6 +131,166 @@ Dict <- function(x = NULL,
   return(string)
 }
 
+
+#' @title ZoteroBib
+#' @keywords internal
+#' @noRd
+ZoteroBib <- \(items,
+               style = "apa-single-spaced",
+               locale = "nn-NO",
+               bibliography = TRUE,
+               citations = TRUE,
+               linkwrap = 1,
+               limit = 10,
+               use.multisession = TRUE,
+               n.workers = NULL,
+               n.chunks = NULL,
+               handler = "cli",
+               restore.defaults = FALSE,
+               silent = FALSE,
+               log = list()) {
+
+  # Visible bindings
+  results <- NULL
+
+  # Define workers and future session
+  process.type <- if (use.multisession) "multisession" else "sequential"
+  if (is.null(n.workers)) n.workers <- max(1, future::availableCores() - 1)
+  if (is.null(n.chunks)) n.chunks <- n.workers
+  if (use.multisession && !inherits(future::plan(), process.type)) {
+    future::plan(process.type, workers = n.workers)
+  } else {
+    future::plan(process.type)
+  }
+
+  bibliography <- if (bibliography) 1 else 0
+  citations <- if (citations) 1 else 0
+
+  GetBib <- \(x) {
+
+    # Convert Zotero item to json
+    json.data <- jsonlite::toJSON(x)
+
+    # Fetch Zotero item in CSL-JSON format
+    httr.post <- Online(
+      httr::RETRY(
+        "POST",
+        "http://localhost:1969/export?format=csljson",
+        body = json.data,
+        httr::add_headers("Content-Type" = "application/json"),
+        quiet = TRUE
+      ),
+      silent = TRUE
+    )
+
+    if (httr.post$error) {
+      return (NULL)
+    }
+
+    json.data <- jsonlite::toJSON(
+      list(items =  ParseUrl(httr.post$data, as = "parsed")),
+      auto_unbox = TRUE
+    )
+
+    query.list <- list(
+      responseformat = "json",
+      style = style,
+      locale = locale,
+      bibliography = bibliography,
+      citations = citations,
+      linkwrap = linkwrap
+    )
+
+    httr.post <- Online(
+      httr::RETRY(
+        "POST",
+        "http://localhost:8085",
+        body = json.data,
+        query = query.list,
+        httr::add_headers("Content-Type" = "application/json"),
+        quiet = TRUE
+      ),
+      silent = TRUE
+    )
+
+    if (httr.post$error) {
+      return (NULL)
+    }
+
+    json.parsed <- ParseUrl(httr.post$data, as = "parsed")
+
+    # Extract bibliography metadata and the single bibliography entry
+    bib.meta  <- GoFish(json.parsed$bibliography[[1]])
+    bib.item  <- GoFish(json.parsed$bibliography[[2]][[1]])
+
+    bib.full <- paste0(
+      bib.meta$bibstart,
+      bib.item,
+      bib.meta$bibend
+    ) |>
+      GoFish()
+
+    # Wrap the citation text in a <span> tag
+    citation.full <- sprintf(
+      "<span>%s</span>",
+      json.parsed$citations[[1]][2]
+    ) |>
+      GoFish()
+
+    bib.body <- paste0(bib.meta$bibstart, "%s" , bib.meta$bibend) |>
+      GoFish()
+
+    result <- tibble::tibble(
+      bib        = Trim(bib.full),
+      citation   = Trim(citation.full),
+      bib.body   = Trim(bib.body),
+      bib.item   = Trim(bib.item)
+    )
+
+    return (result)
+
+  }
+
+  if (any(nrow(items))) {
+
+    if ((nrow(items) / limit) <= n.workers) {
+      bib.chunks <- SplitData(items, chunks = n.chunks)
+    } else {
+      bib.chunks <- SplitData(items, limit)
+    }
+
+    bib.items <- ProcessData({
+      p <- progressr::progressor(steps = length(bib.chunks))
+      run <- future_lapply(bib.chunks, \(chunk) {
+        bibs <- NULL
+        for (i in seq_len(nrow(chunk))) {
+          new.bib <- tibble::tibble(
+            key = chunk$key[[i]],
+            version = chunk$version[[i]],
+            GetBib(chunk[i, ])
+          )
+          bibs <- dplyr::bind_rows(bibs, new.bib)
+        }
+        p(message = "Processing data...")
+        return (bibs)
+      },
+      future.seed = TRUE)
+      dplyr::bind_rows(run)
+    },
+    n = nrow(items),
+    use.multisession = use.multisession,
+    restore.defaults = restore.defaults,
+    handler = handler,
+    silent = silent,
+    )
+
+    log <- c(log, bib.items$log)
+    results <- bib.items$results
+  }
+
+  return(list(results = results, log = log))
+}
+
 #' @title LocalStorage
 #' @keywords internal
 #' @noRd
@@ -175,27 +337,14 @@ LocalStorage <- \(name,
 
 }
 
-#' @title FixItems
-#' @keywords internal
-#' @noRd
-FixItems <- function(items) {
- items <- items |>
-  AddMissing(
-    missing.names = c("dateModified", "prefix", "relations"),
-    na.type = NA_character_,
-    location = NULL
-  ) |>
-  dplyr::mutate(
-    dateModified = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-  )
-
- return (items)
-}
-
 #' @title EtALSimple
 #' @keywords internal
 #' @noRd
 EtALSimple <- function(data) {
+
+  # visible bindings
+  creatorType <- NULL
+
   # Filter to keep only rows where creatorType is "author"
   data <- dplyr::filter(data, creatorType == "author")
 
@@ -219,7 +368,6 @@ EtALSimple <- function(data) {
     stringr::str_c(author.names[1], " et al.")
   }
 }
-
 
 #' @title CreatorName
 #' @keywords internal
@@ -410,6 +558,40 @@ OpenAlex <- \(doi) {
 
 }
 
+#' @title SemanticScholar
+#' @keywords internal
+#' @noRd
+SemanticScholar <- \(doi) {
+
+  doi <- c2z::CheckDoi(doi, doi.only = TRUE)
+  if (is.null(doi)) return (NULL)
+
+  # Try DOI key
+  httr.get <- Online(
+    httr::RETRY(
+      "GET",
+      sprintf("https://api.semanticscholar.org/v1/paper/DOI:%s", doi),
+      quiet = TRUE
+    ),
+    silent = TRUE,
+    message = "DOI",
+    reference = doi,
+  )
+
+  # Log and return error if status code != 200
+  if (httr.get$error) {
+    return (NULL)
+  }
+
+  # Format JSON
+  doi.json <- jsonlite::fromJSON(
+    ParseUrl(httr.get$data, "text")
+  )
+
+  return (doi.json)
+
+}
+
 #' @title Unpaywall
 #' @keywords internal
 #' @noRd
@@ -539,7 +721,7 @@ UnlinkItems <- \(remove.keys,
   }
 
   if (monthlies) {
-    for (lang in supported_lang) {
+    for (lang in supported.lang) {
       ProcessRds(paste0("monthlies_", lang), remove.keys)
     }
   }
@@ -549,7 +731,7 @@ UnlinkItems <- \(remove.keys,
     data <- ProcessRds("sdg_predictions", remove.keys)
     saveRDS(
       SdgSummary(data),
-      file.path(local.storage, "sdg_predictions_summary.rds")
+      file.path(local.storage, "sdg_predictiomers_summary.rds")
     )
   }
 
@@ -631,43 +813,14 @@ FindNvi <- \(data) {
 SdgPredictions <- \(data, sdg.host, sdg.batch, silent = FALSE) {
 
   # Visible bindings
-  predictions <- results <- abstractNote <- key <- title <- text <- NULL
-
-
-  if (!any(nrow(data))) {
-    return (NULL)
-  }
-
-  missing.names <- c("title", "shortTitle", "abstractNote",
-                     "publicationTitle", "bookTitle")
-  data <- AddMissing(
-    data,
-    missing.names,
-    na.type = NA_character_,
-    location = NULL
-  )
-
-  # Find abstracts
-  abstracts <- data |>
-    dplyr::filter(!is.na(abstractNote)) |>
-    dplyr::transmute(
-      key,
-      version,
-      authors = purrr::map_chr(creators, EtAl),
-      title = dplyr::coalesce(title, shortTitle),
-      abstract = abstractNote,
-      source = dplyr::coalesce(publicationTitle, bookTitle)
-    )
-
-  if (!any(nrow(abstracts))) {
-    return (NULL)
-  }
+  predictions <- results <- abstractNote <- key <- title <- text <-
+    creators <- shortTitle <- publicationTitle <- bookTitle <- NULL
 
   SdgApi <- \(items) {
 
     # Define JSON
     json.data <- jsonlite::toJSON(
-      abstracts,
+      items,
       auto_unbox = TRUE,
       na = "null"
     )
@@ -697,6 +850,36 @@ SdgPredictions <- \(data, sdg.host, sdg.batch, silent = FALSE) {
 
     return (results)
 
+  }
+
+
+  if (!any(nrow(data))) {
+    return (NULL)
+  }
+
+  missing.names <- c("title", "shortTitle", "abstractNote",
+                     "publicationTitle", "bookTitle")
+  data <- AddMissing(
+    data,
+    missing.names,
+    na.type = NA_character_,
+    location = NULL
+  )
+
+  # Find abstracts
+  abstracts <- data |>
+    dplyr::filter(!is.na(abstractNote)) |>
+    dplyr::transmute(
+      key,
+      version,
+      authors = purrr::map_chr(creators, EtAl),
+      title = dplyr::coalesce(title, shortTitle),
+      abstract = abstractNote,
+      source = dplyr::coalesce(publicationTitle, bookTitle)
+    )
+
+  if (!any(nrow(abstracts))) {
+    return (NULL)
   }
 
   sdg.batches <- SplitData(abstracts, sdg.batch)
@@ -885,6 +1068,11 @@ CreateMonthlies <- \(zotero,
                      unit.paths,
                      collections,
                      full.update,
+                     use.multisession,
+                     n.workers,
+                     n.chunks,
+                     handler,
+                     restore.defaults,
                      lang,
                      style,
                      locale,
@@ -894,11 +1082,10 @@ CreateMonthlies <- \(zotero,
   # Visible bindings
   new.zotero <- key <- version <- version <- name <- id <-
     cristin.id <- year <- month <- inn.cards <- new.keys <-
-    updated.keys <- where <- key <-abstractNote <- NULL
+    updated.keys <- where <- key <-abstractNote <- extra <- NULL
 
   # Function to enhance bibliography
-  EnhanceBib <- \(items,
-                  bibliography,
+  EnhanceBib <- \(bibliography,
                   collections,
                   unit.paths,
                   silent) {
@@ -907,7 +1094,7 @@ CreateMonthlies <- \(zotero,
       # Filter out collections found in unit.paths
       x <- unit.paths |>
         dplyr::filter(key %in% collections) |>
-        pull(name)
+        dplyr::pull(name)
       # Create data frame if number of collections is >= levels in collecitons
       if (length(x) <= max(unit.paths$level)) {
         x <- data.frame(t(x))
@@ -946,10 +1133,7 @@ CreateMonthlies <- \(zotero,
     }
 
     bib <- bibliography |>
-      dplyr::arrange(match(key, items$key)) |>
       dplyr::mutate(
-        cristin.id = ZoteroId("Cristin", items$extra),
-        collections = items$collections,
         collection.names = purrr::pmap(
           list(collections, cristin.id), ~ CollectionNames(unit.paths, .x, .y),
           .progress = if (!silent) "Finding collections" else FALSE
@@ -992,7 +1176,7 @@ CreateMonthlies <- \(zotero,
   check.items <- c2z::ZoteroGet(
     ListValue(zotero, "collection.key", unit.paths$key[[1]]),
     format = "versions",
-    silent = silent,
+    silent = TRUE,
     append.items = TRUE,
     result.type = "key",
     force = TRUE
@@ -1020,7 +1204,7 @@ CreateMonthlies <- \(zotero,
   }
 
   # Set all check item keys to new keys if full update or items is empty
-  if (!any(nrow(items)) | full.update) {
+  if (!any(nrow(items)) || full.update) {
     new.keys <- unique(c(new.keys, check.items$key))
   } else {
     # Check if there are new/modified items
@@ -1054,72 +1238,136 @@ CreateMonthlies <- \(zotero,
     new.keys <- unique(c(new.keys, items$key))
   }
 
-  # Check if there are keys in items that are not in monthlies
-  if (any(nrow(items)) & any(nrow(monthlies))) {
-    missing.keys <- items |>
-      dplyr::anti_join(monthlies, by = c("key", "version")) |>
-      dplyr::pull(key) |>
-      GoFish(type = NULL)
-    new.keys <- unique(c(new.keys, missing.keys))
-  } else if (!any(nrow(monthlies))) {
-    new.keys <- unique(c(new.keys, items$key))
-  }
-
   # Fetch bibliography for new items
   if (any(length(new.keys))) {
 
     # Updated keys
     updated.keys <- new.keys
 
-    # Log
-    log <-  LogCat(
-      "Creating bibliographies",
-      silent = silent,
-      log = log
-    )
+    limit <- 100
+    new.keys <- tibble::tibble(key = updated.keys)
+    if ((nrow(new.keys) / limit) <= n.workers) {
+      zotero.chunks <- SplitData(new.keys, chunks = n.chunks)
+    } else {
+      zotero.chunks <- SplitData(new.keys, limit)
+    }
 
-    # New items
-    new.zotero <- c2z::ZoteroGet(
-      zotero,
-      item.keys = new.keys,
-      item.type = "-attachment || note",
-      library.type = "data,bib,citation",
-      style = style,
-      locale = locale,
+    start.message <- sprintf("Fetching %s from Zotero library",
+                             Numerus(nrow(new.keys), "item"))
+
+    zotero.items <- ProcessData(
+      {
+        p <- progressr::progressor(steps = length(zotero.chunks))
+        run <- future_lapply(zotero.chunks, \(chunk) {
+
+          chunk <- c2z::ZoteroGet(
+            zotero,
+            item.keys = chunk$key,
+            item.type = "-attachment || note",
+            silent = TRUE,
+            force = TRUE,
+            use.collection = FALSE
+          )$results
+
+          p(message = "Processing data...")
+
+          return (GoFish(chunk, NULL))
+        },
+        future.seed = TRUE)
+        dplyr::bind_rows(run)
+      },
+      start.message = start.message,
+      use.multisession = use.multisession,
+      restore.defaults = restore.defaults,
+      handler = handler,
       silent = silent,
-      force = TRUE,
-      use.collection = FALSE
     )
+    log <- c(log, zotero.items$log)
 
     # Update items
-    items <- UpdateInsert(items, new.zotero$results)
+    items <- UpdateInsert(items, zotero.items$results)
 
     # Update bibliography
-    bibliography <- UpdateInsert(bibliography, new.zotero$bibliography)
+    new.bibliography <- ZoteroBib(
+      zotero.items$results,
+      style = style,
+      locale = locale,
+      use.multisession = use.multisession
+    )
+
+    # Update bibliography
+    bibliography <- UpdateInsert(bibliography, new.bibliography$results) |>
+      dplyr::arrange(match(key, items$key))
 
     # Arrange bibliography according to items
-    if (any(nrow(bibliography)) & any(nrow(items))) {
-      bibliography <- bibliography |>
-        dplyr:: arrange(match(key, items$key))
+    if (any(nrow(bibliography))) {
 
-      # Log monthly bibliographies for Cristin
-      log <-  LogCat(
-        "Creating monthly bibliographies",
+      # Check if there are keys in items that are not in monthlies
+      if (any(nrow(monthlies))) {
+        new.monthlies <- bibliography |>
+          dplyr::anti_join(monthlies, by = dplyr::join_by(key, version))
+      } else if (!any(nrow(monthlies))) {
+        new.monthlies <- bibliography
+      }
+
+
+      # Add collections and cristin ids from the items
+      new.monthlies <- new.monthlies |>
+        dplyr::left_join(
+          items |>
+            dplyr::select(key, version, collections, extra),
+          by = dplyr::join_by(key, version)
+        ) |>
+        dplyr::mutate(
+          cristin.id = ZoteroId("Cristin", extra)
+        )
+
+      limit <- 100
+      if ((nrow(new.monthlies) / limit) <= n.workers) {
+        bib.chunks <- SplitData(new.monthlies, chunks = n.chunks)
+      } else {
+        bib.chunks <- SplitData(new.monthlies, limit)
+      }
+
+      start.message <- sprintf(
+        "Creating %s",
+        Numerus(
+          nrow(new.keys),
+          "monthly bibliography",
+          "monthly bibliographies"
+        )
+      )
+
+      bib.items <- ProcessData(
+        {
+          p <- progressr::progressor(steps = length(bib.chunks))
+          run <- future_lapply(bib.chunks, \(chunk) {
+
+            chunk <- EnhanceBib(
+              chunk,
+              collections,
+              unit.paths,
+              silent
+            )
+
+            p(message = "Processing data...")
+
+            return (chunk)
+          },
+          future.seed = TRUE)
+          dplyr::bind_rows(run)
+        },
+        start.message = start.message,
+        use.multisession = use.multisession,
+        restore.defaults = restore.defaults,
+        handler = handler,
         silent = silent,
-        log = log
       )
-
-      # Create monthlies for new items
-      new.monthlies <- EnhanceBib(
-        items,
-        bibliography,
-        collections,
-        unit.paths,
-        silent
-      )
+      log <- c(log, bib.items$log)
 
       # Update or insert items
-      monthlies <- UpdateInsert(monthlies, new.monthlies)
+      monthlies <- UpdateInsert(monthlies, bib.items$results) |>
+        dplyr::arrange(match(key, items$key))
 
     }
   }
@@ -1162,7 +1410,8 @@ CreateSdgs <- \(items,
   }
 
   # Update sdg if missing items
-  if (any(nrow(items)) | full.update) {
+  if (any(nrow(items)) || full.update) {
+
     log <-  LogCat(
       "Predicting SDG (this may take awhile...)",
       silent = silent,
@@ -1189,117 +1438,72 @@ CreateSdgs <- \(items,
 #' @title CreateExtras
 #' @keywords internal
 #' @noRd
-CreateExtras <- \(items,
-                  extras,
+CreateExtras <- \(extras,
                   get.unpaywall,
                   get.ezproxy,
                   ezproxy.host,
-                  full.update,
-                  lang,
-                  silent,
-                  log = list()) {
+                  silent) {
 
-  # Visible bindings
+  # Visible bin.dings
   new.items <- where <- key <- title <- itemType <-
-    abstractNote <- cristin.id <- prefix <- ISBN <- DOI <-
+    abstractNote <- cristin.id <- prefix <- ISBN <- DOI <- extra <-
     doi <- NULL
 
-  # Function to enhance bibliography
-  GetExtras <- \(items,
-                 get.unpaywall,
-                 get.ezproxy,
-                 ezproxy.host,
-                 silent) {
-
-    extras <- items |>
-      dplyr::transmute(
-        key,
-        version,
-        title,
-        type = itemType,
-        abstract = abstractNote,
-        cristin.id = ZoteroId("Cristin", extra),
-        cristin.url = paste0(
-          "https://app.cristin.no/results/show.jsf?id=",
-          cristin.id
-        ),
-        zotero.url = sprintf(
-          "http://zotero.org/%s/items/%s", prefix, key
-        ),
-        cristin.ids = purrr::map(
-          cristin.id, ~ CristinId(.x),
-          .progress = if (!silent) "Finding Cristin IDs" else FALSE
-        ),
-        isbn = GoFish(ISBN),
-        doi =  purrr::pmap_chr(
-          list(GoFish(DOI), GoFish(extra)), ~
-            GetDoi(...),
-          .progress = if (!silent) "Finding DOI" else FALSE
-        ),
-        extra
-      )
-
-    # Add unpaywall if get.unpaywall is TRUE
-    if (get.unpaywall) {
-      extras <- extras |>
-        dplyr::mutate(
-          unpaywall =  purrr::map_chr(
-            doi, ~ OpenAlex(.x),
-            .progress = if (!silent) "Searching Unpaywall" else FALSE
-          )
-        )
-    }
-
-    # Add ezproxy if get.ezproxy is TRUE
-    if (get.ezproxy) {
-      extras <- extras |>
-        dplyr::mutate(
-          ezproxy =
-            dplyr::case_when(
-              !is.na(GoFish(unpaywall)) ~ NA_character_,
-              TRUE ~ purrr::map_chr(
-                doi, ~ Ezproxy(.x, host = ezproxy.host),
-                .progress = if (!silent) "Defining EZproxy" else FALSE
-              )
-            )
-        )
-    }
-
-    return (extras)
-
-  }
-
-
-  # Check if any missing items
-  if (any(nrow(extras))) {
-    items <- items |>
-      dplyr::anti_join(extras, by = c("key", "version"))
-  }
-
-  if (any(nrow(items)) | full.update) {
-
-    # Create monthlies for new items
-    new.extras <- GetExtras(
-      items,
-      get.unpaywall,
-      get.ezproxy,
-      ezproxy.host,
-      silent
+  extras <- extras |>
+    dplyr::transmute(
+      key,
+      version,
+      title,
+      type = itemType,
+      abstract = abstractNote,
+      cristin.id = ZoteroId("Cristin", extra),
+      cristin.url = paste0(
+        "https://app.cristin.no/results/show.jsf?id=",
+        cristin.id
+      ),
+      zotero.url = sprintf(
+        "http://zotero.org/%s/items/%s", prefix, key
+      ),
+      cristin.ids = purrr::map(
+        cristin.id, ~ CristinId(.x),
+        .progress = if (!silent) "Finding Cristin IDs" else FALSE
+      ),
+      isbn = GoFish(ISBN),
+      doi =  purrr::pmap_chr(
+        list(GoFish(DOI), GoFish(extra)), ~
+          GetDoi(...),
+        .progress = if (!silent) "Finding DOI" else FALSE
+      ),
+      extra
     )
 
-    # Update or insert items
-    extras <- UpdateInsert(extras, new.extras)
-
+  # Add unpaywall if get.unpaywall is TRUE
+  if (get.unpaywall) {
+    extras <- extras |>
+      dplyr::mutate(
+        unpaywall =  purrr::map_chr(
+          doi, ~ OpenAlex(.x),
+          .progress = if (!silent) "Searching Unpaywall" else FALSE
+        )
+      )
   }
 
-  # Create return.list
-  return.list <- list(
-    extras = extras,
-    log = log
-  )
+  # Add ezproxy if get.ezproxy is TRUE
+  if (get.ezproxy) {
+    extras <- extras |>
+      dplyr::mutate(
+        ezproxy =
+          dplyr::case_when(
+            !is.na(GoFish(unpaywall)) ~ NA_character_,
+            TRUE ~ purrr::map_chr(
+              doi, ~ Ezproxy(.x, host = ezproxy.host),
+              .progress = if (!silent) "Defining EZproxy" else FALSE
+            )
+          )
+      )
+  }
 
-  return (return.list)
-
+  return (extras)
 }
 
 #' @title ExamineItems
@@ -1747,8 +1951,25 @@ InnUsers <- \(i = 1,
               lang = "nn",
               get.cristin = TRUE,
               get.cards = TRUE,
+              limit = 10,
+              use.multisession = TRUE,
+              n.workers = NULL,
+              n.chunks = NULL,
+              handler = "cli",
+              restore.defaults = FALSE,
               silent = FALSE,
               log = list()) {
+
+
+  # Define workers and future session
+  process.type <- if (use.multisession) "multisession" else "sequential"
+  if (is.null(n.workers)) n.workers <- max(1, future::availableCores() - 1)
+  if (is.null(n.chunks)) n.chunks <- n.workers
+  if (use.multisession && !inherits(future::plan(), process.type)) {
+    future::plan(process.type, workers = n.workers)
+  } else {
+    future::plan(process.type)
+  }
 
   UpdateCard <- \(x, y) {
 
@@ -1867,27 +2088,51 @@ InnUsers <- \(i = 1,
     tidyr::drop_na()
 
   # Add cristin id if get.cristin = TRUE
-  if (get.cristin) {
+  if (get.cristin && any(nrow(users))) {
 
-    log <-  LogCat(
-      "Finding Cristin id of users",
-      silent = silent,
-      log = log
+    if ((nrow(users) / limit) <= n.workers) {
+      users.chunks <- SplitData(users, chunks = n.chunks)
+    } else {
+      users.chunks <- SplitData(users, limit)
+    }
+
+    start.message <- sprintf("Finding Cristin id for %s.",
+                             Numerus(nrow(users), "user"))
+
+    users.data <- ProcessData({
+      p <- progressr::progressor(steps = length(users.chunks))
+      run <- future_lapply(users.chunks, \(chunk) {
+
+        users <- chunk |>
+          dplyr::mutate(
+            cristin.id = purrr::map_chr(
+              full.name, ~ CristinName(.x)
+            )
+          ) |>
+          dplyr::filter(!is.na(cristin.id)) |>
+          dplyr::distinct(cristin.id, .keep_all = TRUE)
+
+
+        p(message = "Processing data...")
+        return (users)
+      },
+      future.seed = TRUE)
+      dplyr::bind_rows(run)
+    },
+    start.message = start.message,
+    use.multisession = use.multisession,
+    restore.defaults = restore.defaults,
+    handler = handler,
+    silent = silent,
     )
 
-    users <- users |>
-      dplyr::mutate(
-        cristin.id = purrr::map_chr(
-          full.name, ~ CristinName(.x), .progress = !silent
-        )
-      ) |>
-      dplyr::filter(!is.na(cristin.id)) |>
-      dplyr::distinct(cristin.id, .keep_all = TRUE)
+    log <- c(log, users.data$log)
+    users <- users.data$results
 
   }
 
   # Add user cards at INN if get.cards is TRUE
-  if (get.cristin & get.cards) {
+  if (get.cristin && get.cards && any(nrow(users))) {
 
     log <-  LogCat(
       "Finding business cards at INN.no",
@@ -1895,19 +2140,49 @@ InnUsers <- \(i = 1,
       log = log
     )
 
-    users <- users |>
-      dplyr::mutate(
-        card = purrr::map_chr(
-          url, ~ InnCards(.x),
-          .progress = !silent
-        ),
-        card = purrr::pmap_chr(
-          list(card, cristin.id), ~
-            UpdateCard(.x, .y),
-          .progress = TRUE
-        )
-      ) |>
-      dplyr::filter(!is.na(card))
+    if ((nrow(users) / limit) <= n.workers) {
+      users.chunks <- SplitData(users, chunks = n.chunks)
+    } else {
+      users.chunks <- SplitData(users, limit)
+    }
+
+    start.message <- sprintf(
+      "Finding business cards at INN.no for %s.",
+      Numerus(nrow(users), "user")
+    )
+
+    users.data <- ProcessData({
+      p <- progressr::progressor(steps = length(users.chunks))
+      run <- future_lapply(users.chunks, \(chunk) {
+
+        users <- chunk |>
+          dplyr::mutate(
+            card = purrr::map_chr(
+              url, ~ InnCards(.x),
+              .progress = !silent
+            ),
+            card = purrr::pmap_chr(
+              list(card, cristin.id), ~
+                UpdateCard(.x, .y)
+            )
+          ) |>
+          dplyr::filter(!is.na(card))
+
+        p(message = "Processing data...")
+        return (users)
+      },
+      future.seed = TRUE)
+      dplyr::bind_rows(run)
+    },
+    start.message = start.message,
+    use.multisession = use.multisession,
+    restore.defaults = restore.defaults,
+    handler = handler,
+    silent = silent,
+    )
+
+    log <- c(log, users.data$log)
+    users <- users.data$results
 
   }
 
@@ -2258,6 +2533,7 @@ Online <- \(query,
   return (
     list(
       error = error,
+      url =  query$url,
       code = query$status_code,
       data = data,
       log = log
@@ -2391,138 +2667,6 @@ ZoteroToJson <- \(data = NULL) {
   data <- gsub("\"FALSE\"", "false", data)
   # Remove empty elements
   data <- gsub(",\"\\w+?\":\\{\\}", "", data)
-
-  return (data)
-
-}
-
-#' @title ZoteroFormat
-#' @keywords internal
-#' @noRd
-ZoteroFormat <- \(data = NULL,
-                  format = NULL,
-                  prefix = NULL) {
-
-  # Run if not empty
-  if (all(is.na(GoFish(data)))) {
-    return (NULL)
-  }
-
-  # Return as tibble if format is keys/versions
-  if (any(format %in% c("keys", "versions"))) {
-
-    # If string of characters (e.g., keys only)
-    if (format == "keys") {
-
-      data <- strsplit(data, "\n") |>
-        unlist() |>
-        (\(x) tibble::tibble(key = x))()
-
-      # Else if keys and versions
-    } else {
-
-      data <- jsonlite::fromJSON(data) |>
-        (\(x) tibble::tibble(key = names(x), version = unlist(x)))()
-
-    }
-
-    return (data)
-
-  }
-
-  # Visible bindings
-  creators <- NULL
-
-  multiline.items <- c("tags",
-                       "extra",
-                       "abstractNote",
-                       "note",
-                       "creators",
-                       "relations")
-  double.items <- c("version", "mtime")
-  list.items <- c("collections", "relations", "tags")
-
-  # Check if metadata and not in a data frame
-  if (!is.data.frame(data) &
-      (any(format == "json", is.null(format)))) {
-
-    # Check that first element of data is a list
-    if (is.list(data[[1]])) data <-  unlist(data, recursive = FALSE)
-
-    # Check all element in the meta list
-    data.list <- lapply(seq_along(data), \(i) {
-
-      # Define data
-      x <- data[[i]]
-      names <- names(data[i])
-
-      # Make certain fields not in multiline are strings
-      if (!names %in% multiline.items) x <- ToString(x)
-
-      # Add to list if element is a data frame
-      ## Make certain list.items is in a list
-      if (is.data.frame(x) | names %in% list.items) {
-        x <- if (all(is.na(GoFish(as.character(unlist(x)))))) NA else list(x)
-
-        # Make certain double.items are double
-      } else if (names %in% double.items) {
-        x <- as.double(x)
-        # Else make certain remaining items are character
-      } else {
-        x <- as.character(x)
-      }
-
-      return (x)
-
-    })
-    # Name elements
-    names(data.list) <- names(data)
-    # Keep number of columns fixed for simple conversion to tibble/JSON
-    ## Replace empty elements with NA
-    data.list[lengths(data.list) == 0] <- NA
-    # Set key and initial version is missing
-    if (!"key" %in% names(data.list)) {
-      data.list <- c(key = ZoteroKey(), version = 0, data.list)
-    }
-    # Remove elements not in category if item
-    if (!"parentCollection" %in% names(data.list)) {
-      data.list <- data.list[
-        names(data.list) %in%
-          c("key", "version", ZoteroTypes(data.list$itemType))]
-    }
-
-    # Format as tibble and remove empty elements
-    data <- tibble::as_tibble(data.list[lengths(data.list) != 0])
-
-  }
-
-  # Set data as tibble if data frame
-  if (is.data.frame(data)) {
-
-    data <- tibble::as_tibble(data) |>
-      # Replace empty string with NA
-      dplyr::mutate_if(is.character, list(~dplyr::na_if(., ""))) |>
-      dplyr::mutate(
-        # Make certain tags is a data.frame within a list
-        dplyr::across(
-          dplyr::any_of("tags"), ~ purrr::map(tags, ~ {
-            if (all(!is.na(.x))) as.data.frame(.x)
-          })
-        ),
-        # Make certain that parentCollection is a character
-        dplyr::across(dplyr::any_of("parentCollection"), as.character),
-        # Add prefix if defined
-        prefix = GoFish(prefix),
-        # Fix creators
-        creators = GoFish(purrr::map(creators, FixCreators))
-      ) |>
-      # Remove empty columns
-      dplyr::select(dplyr::where(~sum(!is.na(.x)) > 0))
-
-    # Else convert to string
-  } else {
-    data <- ToString(data, "\n")
-  }
 
   return (data)
 
@@ -2814,24 +2958,24 @@ Eta <- \(start.time,
 #' @title SplitData
 #' @keywords internal
 #' @noRd
-SplitData <- \(data, limit) {
-
-  # Split metadata into acceptable chunks (k > 50)
-  if (nrow(data)>limit) {
-    data <- split(
-      data,
-      rep(
-        seq_len(ceiling(nrow(data)/limit)),
-        each=limit,
-        length.out=nrow(data)
-      )
-    )
+SplitData <- function(data, limit = NULL, chunks = NULL) {
+  # If 'chunks' is provided, split the data into exactly that many pieces
+  if (!is.null(chunks)) {
+    data <- split(data, rep(seq_len(chunks), length.out = nrow(data)))
   } else {
-    data <- list(data)
+    # Otherwise, split into chunks of size 'limit' if necessary
+    if (nrow(data) > limit) {
+      data <- split(
+        data,
+        rep(seq_len(ceiling(nrow(data) / limit)),
+            each = limit,
+            length.out = nrow(data))
+      )
+    } else {
+      data <- list(data)
+    }
   }
-
-  return (data)
-
+  return(data)
 }
 
 #' @title ComputerFriendly
@@ -2918,75 +3062,9 @@ ToString <- \(x, sep = ", ") {
 
 }
 
-#' @title AddColumns
-#' @keywords internal
-#' @noRd
-AddColumns <- function(x, y) {
-  missing.cols <- setdiff(names(y), names(x))
-  for (col in missing.cols) {
-    new.val <- if (is.factor(y[[col]])) {
-      factor(NA, levels = levels(y[[col]]))
-    } else if (is.integer(y[[col]])) {
-      NA_integer_
-    } else if (is.numeric(y[[col]])) {
-      NA_real_
-    } else if (is.character(y[[col]])) {
-      NA_character_
-    } else if (is.logical(y[[col]])) {
-      NA
-    } else {
-      NA
-    }
-    x <- dplyr::mutate(x, !!col := new.val)
-  }
-  return (x)
-}
 
 
-#' @title UpdateInsert
-#' @keywords internal
-#' @noRd
-UpdateInsert <- function(x, y, key = "key") {
-  if (!any(nrow(y))) return(x)
-  if (!any(nrow(x))) return(y)
 
-  # Compute the union of all column names.
-  all.columns <- union(names(x), names(y))
-
-  # Align the two data frames by adding missing columns using the reference data frame.
-  if (length(names(x)) < length(names(y))) {
-    x <- AddColumns(x, y)  # x is missing columns that are in y.
-  } else if (length(names(y)) < length(names(x))) {
-    y <- AddColumns(y, x)  # y is missing columns that are in x.
-  }
-
-  # Reorder both data frames to have the same column order.
-  x <- dplyr::select(x, dplyr::all_of(all.columns))
-  y <- dplyr::select(y, dplyr::all_of(all.columns))
-
-  # Align common columns' types: convert y's columns to match the types in x.
-  common.cols <- intersect(names(x), names(y))
-  for (col in common.cols) {
-    if (!identical(class(x[[col]]), class(y[[col]]))) {
-      if (is.logical(x[[col]])) {
-        y[[col]] <- as.logical(y[[col]])
-      } else if (is.numeric(x[[col]])) {
-        y[[col]] <- as.numeric(y[[col]])
-      } else if (is.integer(x[[col]])) {
-        y[[col]] <- as.integer(y[[col]])
-      } else if (is.character(x[[col]])) {
-        y[[col]] <- as.character(y[[col]])
-      } else if (is.factor(x[[col]])) {
-        y[[col]] <- factor(y[[col]], levels = levels(x[[col]]))
-      }
-    }
-  }
-
-  # Perform the upsert: update matching rows (by key) and insert new rows.
-  x <- dplyr::rows_upsert(x, y, by = key)
-
-  return(x)
-}
 
 
 #' @title AddMissing
@@ -3140,53 +3218,48 @@ SaveData <- \(data,
 #' @title CleanText
 #' @keywords internal
 #' @noRd
-CleanText <- \(x, multiline = FALSE) {
+CleanText <- function(x, multiline = FALSE) {
 
-  # Trim original vector
-  x <- Trim(x)
+  if (any(is.na(GoFish(x)))) return (x)
 
-  # List of characters to remove
-  character.vector <- c(",",":",";","-","--","\u2013","\u2014",
-                        "[","]","{","}","=","&","/")
-  remove.characters <- paste0("\\", character.vector, collapse="|")
+  # Define unwanted characters to remove at the beginning and end.
+  unwanted_chars <- c(",", ":", ";", "-", "--", "\u2013", "\u2014",
+                      "\\[", "\\]", "\\{", "\\}", "=", "&", "/")
+  pattern_start <- paste0("^(", paste(unwanted_chars, collapse = "|"), ")+")
+  pattern_end   <- paste0("(", paste(unwanted_chars, collapse = "|"), ")+$")
 
-  # Remove first character if unwanted
-  first.character <- gsub(remove.characters, "", substring(x, 1, 1))
-  # Put Humpty togheter again
-  if (max(0,nchar(Trim(gsub("(\\s).*", "\\1", x)))) == 1) {
-    x <- paste(first.character, Trim(substring(x, 2)))
-  } else {
-    x <- paste0(first.character, Trim(substring(x, 2)))
+  # Remove unwanted characters from the beginning and end of the string.
+  x <- sub(pattern_start, "", x)
+  x <- sub(pattern_end, "", x)
+
+  # Remove newline characters if multiline is set to FALSE.
+  if (!multiline) {
+    x <- gsub("\r?\n|\r", " ", x)
   }
 
-  # Remove last character if unwanted
-  last.character <- gsub(remove.characters, "", substr(x, nchar(x), nchar(x)))
-  # Put Humpty togheter again
-  x <- paste0(Trim(substr(x, 1, nchar(x)-1)), last.character)
+  # Remove HTML/XML tags and common HTML entities.
+  x <- gsub("<.*?>|&lt;|&gt;|\ufffd", "", x)
 
-  # Remove any #. (e.g., 1. Title)
-  x <- Trim(gsub("^\\s*\\d+\\s*\\.", "", x))
+  # Remove the word "abstract" from the beginning (case-insensitive)
+  x <- sub("(?i)^abstract\\b\\s*", "", x, perl = TRUE)
 
-  # Remove \r\n if multiline is set to FALSE
-  if (!multiline) x <- Trim(gsub("\r?\n|\r", " ", x))
-
-  # Remove HTML/XML tags
-  x <- Trim(gsub("<.*?>|\ufffd|&lt;|&gt", "", x))
-
-  # Remove any abstract from beginning of string
-  if (any(grepl("abstract", tolower(substr(x, 1, 8))))) {
-    x <- substring(x, 9)
-  }
-
-  # Convert ALL CAPITALS to All Capitals
-  if (all(stringr::str_detect(x, "^[[:upper:][:space:]]+$"))) {
+  # If the text is in ALL CAPS (allowing spaces), convert it to Title Case.
+  if (grepl("^[[:upper:][:space:]]+$", x)) {
     x <- stringr::str_to_title(x)
   }
 
-  # Remove NA
-  x <- x[! x %in% c("NANA")]
+  # Remove the literal string "NANA" if that's the entire string.
+  if (x == "NANA") {
+    x <- ""
+  }
 
-  return (x)
+  # Collapse multiple whitespace characters into a single space.
+  x <- gsub("\\s+", " ", x)
+
+  # Trim leading and trailing whitespace using Trim.
+  x <- Trim(x)
+
+  return(x)
 
 }
 

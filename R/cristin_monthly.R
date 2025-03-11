@@ -28,6 +28,20 @@
 #' @param check.items Examine items for duplicates and multidepartemental
 #' publications, Default: TRUE
 #' @param use.identifiers Use if ISBN/DOI identifiers if enabled, Default: TRUE
+#' @param use.multisession Logical. If \code{TRUE} (default), parallel
+#' processing using multisession is employed; otherwise, processing is sequential.
+#' @param n.workers Optional integer for the number of workers to be used in
+#' multisession mode. If \code{NULL}, it defaults to the number of available
+#' cores minus one (with a minimum of one).
+#' @param n.chunks Optional integer for the number of chunks to process.
+#' If \code{NULL}, it defaults to the number of workers.
+#' @param handler The progress handler to be used by the \code{progressr}
+#' package. If \code{NULL} and
+#'   \code{silent} is \code{FALSE}, it defaults to \code{"txtprogressbar"}.
+#'   When \code{silent} is \code{TRUE},
+#'   the handler is set to \code{"void"}.
+#' @param restore.defaults Logical. If \code{TRUE} (default), the current
+#' \code{future} plan is saved and restored upon exit.
 #' @param full.update Update bibliography for all items in library,
 #' Default: FALSE
 #' @param lang Define bibliography language (nn, nb, en), Default: 'nn'
@@ -47,7 +61,7 @@
 #'   example <- CristinMonthly(
 #'     c2z::Zotero(
 #'       id = "4827927",
-#'       api = "RqlAmlH5l1KPghfCseAq1sQ1",
+#'       api = "Io1bwAiOjB1jPgUNegjJhJxF",
 #'       user = FALSE
 #'     ),
 #'     unit.id = "209.5.10.0",
@@ -96,6 +110,11 @@ CristinMonthly <- \(zotero,
                     nvi = TRUE,
                     check.items = TRUE,
                     use.identifiers = TRUE,
+                    use.multisession = FALSE,
+                    n.workers = NULL,
+                    n.chunks = NULL,
+                    handler = NULL,
+                    restore.defaults = TRUE,
                     full.update = FALSE,
                     lang = "nn",
                     post.lang = "nn",
@@ -113,13 +132,25 @@ CristinMonthly <- \(zotero,
     new.keys <- examine.items <- monthlies <- version.x <-
     version.y <- log.eta <- id <- multidepartmental <-
     duplicates <- extras <- cristin.id <- items <- collections <-
-    updated.keys <- col.lang <- sdg <- sdg.summary <- NULL
+    updated.keys <- col.lang <- sdg <- sdg.summary <- zotero.items <-
+    new.items <- value <- llm_sdgs_final <- extra <- bibliography <-
+    monthlies <- NULL
 
   # Languages
   # Set lang as nn if no
   if (lang %in% c("no")) lang <- "nn"
   # Set lang to en if not Norwegian
   if (!lang %in% c("nb", "nn", "no")) lang <- "en"
+
+  # Define workers and future session
+  process.type <- if (use.multisession) "multisession" else "sequential"
+  if (is.null(n.workers)) n.workers <- max(1, future::availableCores() - 1)
+  if (is.null(n.chunks)) n.chunks <- n.workers
+  if (use.multisession && !inherits(future::plan(), process.type)) {
+    future::plan(process.type, workers = n.workers)
+  } else {
+    future::plan(process.type)
+  }
 
   # Define units
   units <- CristinUnits(
@@ -141,7 +172,7 @@ CristinMonthly <- \(zotero,
   n.paths <- ncol(dplyr::select(units, dplyr::starts_with("path")))+2
 
   # Try to restore collections if local.storage is TRUE
-  collection <- LocalStorage(
+  collections <- LocalStorage(
     "collections",
     local.storage,
     message = "Loading Collections",
@@ -303,12 +334,13 @@ CristinMonthly <- \(zotero,
     }
 
     # Try to restore zotero items if local.storage is defined
-    zotero$items <- LocalStorage(
+    items <- LocalStorage(
       "items",
       local.storage,
       message = "Loading items",
       silent = silent
     )
+    zotero$items <- items
 
     # Run full update if full.update is TRUE or duplicate check is empty
     if (full.update | is.null(zotero$items) & !is.null(collections)) {
@@ -320,104 +352,180 @@ CristinMonthly <- \(zotero,
 
       # Fetch items
       if (length(core.location)) {
-        zotero <- c2z::Zotero(
-          zotero = zotero,
-          collection.key = core.location,
-          search.collections = FALSE,
-          item.type = "-attachment || note",
-          library = TRUE,
-          silent = silent,
+
+        check.keys <- c2z::ZoteroGet(
+          ListValue(zotero, "collection.key", core.location),
+          format = "versions",
+          silent = TRUE,
+          append.items = TRUE,
+          result.type = "key",
           force = TRUE,
-          log = zotero$log
+        )$results
+
+        limit <- 100
+        if ((nrow(units) / limit) <= n.workers) {
+          zotero.chunks <- SplitData(check.keys, chunks = n.chunks)
+        } else {
+          zotero.chunks <- SplitData(check.keys, limit)
+        }
+
+        start.message <- sprintf(
+          "Fetching %s from Zotero library",
+          Numerus(
+            nrow(check.keys),
+            "unit",
+          )
         )
+
+        zotero.items <- ProcessData(
+          {
+            p <- progressr::progressor(steps = length(zotero.chunks))
+            run <- future_lapply(zotero.chunks, \(chunk) {
+
+              chunk <- c2z::ZoteroGet(
+                zotero,
+                item.keys = chunk$key,
+                item.type = "-attachment || note",
+                silent = TRUE,
+                force = TRUE,
+                use.collection = FALSE
+              )$results
+
+              p(message = "Processing data...")
+
+              return (GoFish(chunk, NULL))
+            },
+            future.seed = TRUE)
+            dplyr::bind_rows(run)
+          },
+          start.message = start.message,
+          use.multisession = use.multisession,
+          restore.defaults = restore.defaults,
+          handler = handler,
+          silent = silent,
+        )
+
+        items <- LocalStorage(
+          "items",
+          local.storage,
+          zotero.items$results,
+          message = "Saving items",
+          silent = silent
+        )
+
+        zotero$items <- items
+        log <- c(log, zotero.items$log)
       }
     }
 
-    # Log Cristin search
-    zotero$log <-  LogCat(
-      "Searching Cristin",
-      silent = silent,
-      log = zotero$log
+    # Define end.date in Cristin format
+    end.date <- CeilingDate(ChangeDate(end.date, -1))
+    cristin.chunks <- SplitData(units, 1)
+
+    start.message <- sprintf(
+      "Searching Cristin using %s",
+      Numerus(
+        nrow(units),
+        "unit",
+      )
     )
 
-    # Start time for query
-    query.start <- Sys.time()
+    cristin.items <- ProcessData({
+      p <- progressr::progressor(steps = length(cristin.chunks))
+      run <- future_lapply(cristin.chunks, \(chunk) {
+        new.items <- NULL
+        for (i in seq_len(nrow(chunk))) {
 
-    # Cycle through post.data searching Cristin for each row
-    ## Should perhaps vectorize, but for loop seems more informative tbh
-    for (i in seq_len(nrow(units))) {
+          # Searching Cristin for the current unit
+          cristin <- c2z::Cristin(
+            unit = chunk$id[[i]],
+            created_since = start.date,
+            created_before = end.date,
+            use.identifiers = use.identifiers,
+            use.multisession = use.multisession,
+            handler = handler,
+            restore.defaults = restore.defaults,
+            filter = filter,
+            force = TRUE,
+            silent = cristin.silent,
+            nvi = nvi,
+            zotero = zotero
+          )
 
-      # Searching Cristin
-      cristin <- c2z::Cristin(
-        unit = units$id[[i]],
-        created_since = start.date,
-        created_before = CeilingDate(ChangeDate(end.date, -1)),
-        use.identifiers = use.identifiers,
-        filter = filter,
-        force = FALSE,
-        silent = cristin.silent,
-        nvi = nvi,
-        zotero = zotero
-      )
+          if (any(nrow(cristin$results))) {
+            # Filter the post.data for the current chunk's id
+            period.data <- post.data |>
+              dplyr::filter(chunk$id[[i]] == post.data$id)
 
-      if (any(nrow(cristin$results))) {
+            # For each period (row) in period.data, check which elements of
+            # cristin$created fall between the start.date and end.date.
+            # The result is a list of logical vectors.
+            between.results <- purrr::pmap(
+              list(period.data$start.date, period.data$end.date),
+              \(start.date, end.date) {
+                # dplyr::between returns a logical vector for cristin$created
+                dplyr::between(cristin$created, start.date, end.date)
+              }
+            ) |>
+              tibble::enframe() |>
+              tidyr::unnest_wider(value, names_sep = "")
 
-        # Only use period for current units
-        period.data <-  post.data |>
-          dplyr::filter(units$id[[i]] == post.data$id)
+            # For each column in between.results (excluding the "name" column),
+            # extract the corresponding "path" values from period.data where
+            # the condition is TRUE.
+            cristin$results$collections <- between.results |>
+              dplyr::select(-name) |>
+              purrr::imap(~ unname(unlist(period.data[.x, "path"])))
 
-        # Define the collections of items
-        cristin$results$collections <- period.data |>
-          # Find date period (year - month)
-          dplyr::transmute(
-            purrr::pmap(
-              list(start.date, end.date), ~
-                t(dplyr::between(cristin$created, .x, .y)) |>
-                as.data.frame()
-            )
-          ) |>
-          (\(x) {
-            x <- do.call(dplyr::bind_rows, x)
-            lapply(seq_len(ncol(x)), \(i) unlist(period.data[ x[, i], "path"]))
-          })()
+            # Append the updated cristin results to items.
+            new.items <- dplyr::bind_rows(new.items, cristin$results)
+          }
+        }
+        p(message = sprintf("Processing: %s.", tail(chunk$core[[i]], 1)))
 
-        # Accumulate results
-        items <- dplyr::bind_rows(items, cristin$results)
+        return (new.items)
+      },
+      future.seed = TRUE)
+      dplyr::bind_rows(run)
+    },
+    start.message = start.message,
+    use.multisession = use.multisession,
+    restore.defaults = restore.defaults,
+    handler = handler,
+    silent = silent,
+    )
 
-      } # End Cristin results
-
-      # Estimate time of arrival
-      log.eta <- LogCat(
-        Eta(query.start, i, nrow(units)),
-        silent = silent,
-        flush = TRUE,
-        log = log,
-        append.log = FALSE
-      )
-
-    } # End for loop
-
-    # Add to log
-    zotero$log <- append(zotero$log, log.eta)
+    log <- c(log, cristin.items$log)
+    new.items <- cristin.items$results
 
     # Log number of units and periods
     zotero$log <- LogCat(
       sprintf(
         "Found %s new, or modfied, %s",
-        max(0,nrow(items)),
-        Numerus(max(0,nrow(items)), "item", prefix = FALSE)
+        max(0,nrow(new.items)),
+        Numerus(max(0,nrow(new.items)), "item", prefix = FALSE)
       ),
       silent = silent,
       log = zotero$log
     )
 
     # Find multidepartmental and duplicate items if any items
-    if (any(nrow(items))) {
+    if (any(nrow(new.items))) {
+
+      # Make sure that new items has a unique key.
+      new.items <- new.items |>
+        dplyr::mutate(
+          key = replace(
+            key,
+            version == 0,
+            purrr::map_chr(which(version == 0), ~ZoteroKey())
+          )
+        )
 
       # Examine items
       if (check.items) {
         examine.items <- ExamineItems(
-          items,
+          new.items,
           collections,
           TRUE,
           zotero$log,
@@ -426,15 +534,19 @@ CristinMonthly <- \(zotero,
       }
 
       # Update items
-      item <- examine.items$items
-      zotero$items <- items
+      new.items <- examine.items$items
+      zotero$items <- new.items
 
-      # Remove collections not found in Cristin query
-      zotero$collections <- collections |>
-        dplyr::filter(key %in% unique(unlist(examine.items$items$collections)))
+      if (any(nrow(new.items))) {
 
-      # Post Cristin items to specified collections
-      zotero <- ZoteroPost(zotero, silent = silent, force = TRUE)
+        # Remove collections not found in Cristin query
+        zotero$collections <- collections |>
+          dplyr::filter(key %in% unique(unlist(new.items$collections)))
+
+        # Post Cristin items to specified collections
+        zotero <- ZoteroPost(zotero, silent = silent, force = TRUE)
+
+      }
 
     } # End add items
 
@@ -461,16 +573,17 @@ CristinMonthly <- \(zotero,
     }
 
     # Define updated collections
-    if (any(nrow(items))) {
+    if (any(nrow(new.items))) {
 
-      items <- FixItems(UpdateInsert(items, zotero$items))
-      zotero$items <- LocalStorage(
+      items <- UpdateInsert(items, zotero$items)
+      items <- LocalStorage(
         "items",
         local.storage,
         items,
         message = "Saving items",
         silent = silent
       )
+      zotero$items <- items
 
       updated.keys <- LocalStorage(
         "updated.keys",
@@ -484,11 +597,10 @@ CristinMonthly <- \(zotero,
 
     }
 
-        # Return Zotero list if post.only is TRUE
+    # Return Zotero list if post.only is TRUE
     if (post.only) return (zotero)
 
   } # End post
-
 
   # Remove collections with no items
   collections  <- collections  |>
@@ -580,9 +692,11 @@ CristinMonthly <- \(zotero,
 
   # Create Monthlies
   # Loading items, bibliography and monthlies
-  items <- LocalStorage("items", local.storage)
-  bibliography <- LocalStorage("bibliography", local.storage, lang = lang)
-  monthlies <- LocalStorage("monthlies", local.storage, lang = lang)
+  if (!is.null(local.storage)) {
+    items <- LocalStorage("items", local.storage)
+    bibliography <- LocalStorage("bibliography", local.storage, lang = lang)
+    monthlies <- LocalStorage("monthlies", local.storage, lang = lang)
+  }
 
   # Creating monthlies
   monthlies <- CreateMonthlies(
@@ -593,6 +707,11 @@ CristinMonthly <- \(zotero,
     unit.paths = unit.paths,
     collections = collections,
     full.update = full.update,
+    use.multisession = use.multisession,
+    n.workers = n.workers,
+    n.chunks = n.chunks,
+    handler = handler,
+    restore.defaults = restore.defaults,
     lang = lang,
     style = style,
     locale = locale,
@@ -627,31 +746,80 @@ CristinMonthly <- \(zotero,
 
     # Create Monthlies
     # Loading extras
-    monthlies.extras <- LocalStorage("monthlies_extras", local.storage)
+    extras <- LocalStorage(
+      "monthlies_extras",
+      local.storage,
+      message = "Loading monthlies")
 
-    extras <- CreateExtras(
-      items = items,
-      extras = monthlies.extras,
-      get.unpaywall = get.unpaywall,
-      get.ezproxy = get.ezproxy,
-      ezproxy.host = ezproxy.host,
-      full.update = full.update,
-      lang = lang,
-      silent = silent,
-      log = log
-    )
+    # Check if any missing items
+    if (any(nrow(extras)) && !full.update) {
+      extra.items <- items |>
+        dplyr::anti_join(extras, by = c("key", "version"))
+    } else {
+      extra.items <- items
+    }
 
-    log <- extras$log
-    # Updated keys
-    updated.keys <- c(updated.keys, extras$updated.keys)
+
+    if (any(nrow(extra.items))) {
+
+      # Updated keys
+      updated.keys <- c(updated.keys, extra.items$key)
+      # Perpare for collecting extras for new keys
+
+      limit <- 100
+      if ((nrow(extra.items) / limit) <= n.workers) {
+        extras.chunks <- SplitData(extra.items, chunks = n.chunks)
+      } else {
+        extras.chunks <- SplitData(extra.items, limit)
+      }
+
+      start.message <- sprintf(
+        "Creating %s",
+        Numerus(
+          nrow(extra.items),
+          "enhanced bibliography",
+          "enhanced bibliographies"
+        )
+      )
+
+      extras.data <- ProcessData(
+        {
+          p <- progressr::progressor(steps = length(extras.chunks))
+          run <- future_lapply(extras.chunks, \(chunk) {
+
+            chunk <- CreateExtras(
+              chunk,
+              get.unpaywall,
+              get.ezproxy,
+              ezproxy.host,
+              silent
+            )
+
+            p(message = "Processing data...")
+
+            return (chunk)
+          },
+          future.seed = TRUE)
+          dplyr::bind_rows(run)
+        },
+        start.message = start.message,
+        use.multisession = use.multisession,
+        restore.defaults = restore.defaults,
+        handler = handler,
+        silent = silent,
+      )
+      extras <- UpdateInsert(extras, extras.data$results)
+      log <- c(log, extras.data$log)
 
     extras <- LocalStorage(
       "monthlies_extras",
       local.storage,
-      extras$extras,
+      extras,
       message = "Saving extras",
       silent = silent
     )
+
+    }
 
   }
 
@@ -764,9 +932,18 @@ CristinMonthly <- \(zotero,
     silent = silent
   )
 
+  # Log examine items
+  log <-  LogCat(
+    "Finalizing monthlies",
+    silent = silent,
+    log = log
+  )
+
+
   unit.key <- unit.paths |>
     dplyr::filter(id == unit.id) |>
     dplyr::pull(key)
+
   if (any(nrow(items))) {
     items <- items |>
       dplyr::filter(purrr::map2_lgl(unit.key, collections, ~ .x %in% .y))
