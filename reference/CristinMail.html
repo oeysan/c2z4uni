@@ -18,7 +18,7 @@ from Cristin."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/li
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9001</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9002</span>
       </span>
     </div>
 
@@ -57,7 +57,8 @@ from Cristin.</p>
     <div id="ref-usage">
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">CristinMail</span><span class="op">(</span></span>
 <span>  <span class="va">unit.id</span>,</span>
-<span>  <span class="va">cristin.monthly</span>,</span>
+<span>  <span class="va">monthlies</span>,</span>
+<span>  <span class="va">unit.paths</span>,</span>
 <span>  <span class="va">archive.host</span>,</span>
 <span>  subject <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  header <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -79,8 +80,12 @@ from Cristin.</p>
 <dd><p>The key of the unit for which the email content is generated.</p></dd>
 
 
-<dt id="arg-cristin-monthly">cristin.monthly<a class="anchor" aria-label="anchor" href="#arg-cristin-monthly"></a></dt>
+<dt id="arg-monthlies">monthlies<a class="anchor" aria-label="anchor" href="#arg-monthlies"></a></dt>
 <dd><p>Data containing monthly information from Cristin.</p></dd>
+
+
+<dt id="arg-unit-paths">unit.paths<a class="anchor" aria-label="anchor" href="#arg-unit-paths"></a></dt>
+<dd><p>Data containing the Zotero paths of Cristin units.</p></dd>
 
 
 <dt id="arg-archive-host">archive.host<a class="anchor" aria-label="anchor" href="#arg-archive-host"></a></dt>
@@ -140,37 +145,7 @@ HTML format for email of selected units</p>
 
     <div id="ref-examples">
     <h2>Examples</h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span>  <span class="va">example</span> <span class="op">&lt;-</span> <span class="fu"><a href="CristinMonthly.html">CristinMonthly</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>    <span class="fu">c2z</span><span class="fu">::</span><span class="fu"><a href="https://oeysan.github.io/c2z/reference/Zotero.html" class="external-link">Zotero</a></span><span class="op">(</span></span></span>
-<span class="r-in"><span>      id <span class="op">=</span> <span class="st">"4827927"</span>,</span></span>
-<span class="r-in"><span>      api <span class="op">=</span> <span class="st">"RqlAmlH5l1KPghfCseAq1sQ1"</span>,</span></span>
-<span class="r-in"><span>      user <span class="op">=</span> <span class="cn">FALSE</span></span></span>
-<span class="r-in"><span>    <span class="op">)</span>,</span></span>
-<span class="r-in"><span>    unit.id <span class="op">=</span> <span class="st">"209.5.10.0"</span>,</span></span>
-<span class="r-in"><span>    start.date <span class="op">=</span> <span class="st">"2023-07"</span>,</span></span>
-<span class="r-in"><span>    post <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>    silent <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
-<span class="r-in"><span>    use.identifiers <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
-<span class="r-in"><span>    get.unpaywall <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
-<span class="r-in"><span>    get.ezproxy <span class="op">=</span> <span class="cn">FALSE</span></span></span>
-<span class="r-in"><span>  <span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Searching for collections </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Cristin query based on 1 unit from 07.2023 to 08.2023 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Creating new collections </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> —————————————————Process: 100.00% (1/1). Elapsed time: 00:00:00—————————————————</span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in ProcessData({    p &lt;- progressr::progressor(steps = length(cristin.chunks))    run &lt;- future_lapply(cristin.chunks, function(chunk) {        new.items &lt;- NULL        for (i in seq_len(nrow(chunk))) {            cristin &lt;- c2z::Cristin(unit = chunk$id[[i]], created_since = start.date,                 created_before = end.date, use.identifiers = use.identifiers,                 use.multisession = use.multisession, handler = handler,                 restore.defaults = restore.defaults, filter = filter,                 force = TRUE, silent = cristin.silent, nvi = nvi,                 zotero = zotero)            if (any(nrow(cristin$results))) {                period.data &lt;- dplyr::filter(post.data, chunk$id[[i]] ==                   post.data$id)                between.results &lt;- tidyr::unnest_wider(tibble::enframe(purrr::pmap(list(period.data$start.date,                   period.data$end.date), function(start.date,                   end.date) {                  dplyr::between(cristin$created, start.date,                     end.date)                })), value, names_sep = "")                cristin$results$collections &lt;- purrr::imap(dplyr::select(between.results,                   -name), ~unname(unlist(period.data[.x, "path"])))                new.items &lt;- dplyr::bind_rows(new.items, cristin$results)            }        }        p(message = sprintf("Processing: %s.", tail(chunk$core[[i]],             1)))        return(new.items)    }, future.seed = TRUE)    dplyr::bind_rows(run)}, start.message = start.message, use.multisession = use.multisession,     restore.defaults = restore.defaults, handler = handler, silent = silent,     ):</span> could not find function "ProcessData"</span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span>  <span class="co"># Create HTML email</span></span></span>
-<span class="r-in"><span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/any.html" class="external-link">any</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">example</span><span class="op">$</span><span class="va">monthlies</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>    <span class="va">example.mail</span> <span class="op">&lt;-</span> <span class="fu">CristinMail</span><span class="op">(</span><span class="st">"209.5.10.0"</span>, <span class="va">example</span>, <span class="st">"example.host"</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span>    <span class="co"># Show subject</span></span></span>
-<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">example.mail</span><span class="op">$</span><span class="va">subject</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="op">}</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in example$monthlies:</span> object of type 'closure' is not subsettable</span>
-<span class="r-in"><span><span class="co"># }</span></span></span>
-</code></pre></div>
+
     </div>
   </div>
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">

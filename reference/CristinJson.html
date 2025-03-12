@@ -18,7 +18,7 @@ JSON format, which can be used for various purposes."><!-- mathjax --><script sr
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9001</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9002</span>
       </span>
     </div>
 
@@ -56,7 +56,9 @@ JSON format, which can be used for various purposes.</p>
 
     <div id="ref-usage">
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">CristinJson</span><span class="op">(</span></span>
-<span>  <span class="va">cristin.monthly</span>,</span>
+<span>  <span class="va">monthlies</span>,</span>
+<span>  <span class="va">unit.paths</span>,</span>
+<span>  sdg.data <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  local.storage <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  user.cards <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  full.update <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -70,9 +72,17 @@ JSON format, which can be used for various purposes.</p>
     <h2>Arguments</h2>
 
 
-<dl><dt id="arg-cristin-monthly">cristin.monthly<a class="anchor" aria-label="anchor" href="#arg-cristin-monthly"></a></dt>
-<dd><p>A list containing the monthly data from Cristin,
-including bibliographic information.</p></dd>
+<dl><dt id="arg-monthlies">monthlies<a class="anchor" aria-label="anchor" href="#arg-monthlies"></a></dt>
+<dd><p>Data containing monthly information from Cristin.</p></dd>
+
+
+<dt id="arg-unit-paths">unit.paths<a class="anchor" aria-label="anchor" href="#arg-unit-paths"></a></dt>
+<dd><p>Data containing the Zotero paths of Cristin units.</p></dd>
+
+
+<dt id="arg-sdg-data">sdg.data<a class="anchor" aria-label="anchor" href="#arg-sdg-data"></a></dt>
+<dd><p>Data containing information about Sustainable Development
+Goals (SDGs). Default is NULL.</p></dd>
 
 
 <dt id="arg-local-storage">local.storage<a class="anchor" aria-label="anchor" href="#arg-local-storage"></a></dt>
@@ -132,7 +142,11 @@ JSON format</p>
 <span class="r-in"><span>    <span class="fu">c2z</span><span class="fu">:::</span><span class="fu">GoFish</span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>  <span class="co"># Create json data</span></span></span>
-<span class="r-in"><span>  <span class="va">example.json</span> <span class="op">&lt;-</span> <span class="fu">CristinJson</span><span class="op">(</span><span class="va">example</span>, user.cards <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
+<span class="r-in"><span>  <span class="va">example.json</span> <span class="op">&lt;-</span> <span class="fu">CristinJson</span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="va">example</span><span class="op">$</span><span class="va">monthlies</span>,</span></span>
+<span class="r-in"><span>    <span class="va">example</span><span class="op">$</span><span class="va">unit.paths</span>,</span></span>
+<span class="r-in"><span>    user.cards <span class="op">=</span> <span class="cn">FALSE</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span> <span class="op">|&gt;</span></span></span>
 <span class="r-in"><span>    <span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/prettify.html" class="external-link">prettify</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
 <span class="r-in"><span>    <span class="fu">c2z</span><span class="fu">:::</span><span class="fu">GoFish</span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
