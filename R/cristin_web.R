@@ -9,6 +9,20 @@
 #' @param local.storage Path to local storage directory. Default is NULL.
 #' @param user.cards Logical, indicating whether to update user information
 #' from INN. Default is TRUE.
+#' @param use.multisession Logical. If \code{TRUE} (default), parallel
+#' processing using multisession is employed; otherwise, processing is sequential.
+#' @param n.workers Optional integer for the number of workers to be used in
+#' multisession mode. If \code{NULL}, it defaults to the number of available
+#' cores minus one (with a minimum of one).
+#' @param n.chunks Optional integer for the number of chunks to process.
+#' If \code{NULL}, it defaults to the number of workers.
+#' @param handler The progress handler to be used by the \code{progressr}
+#' package. If \code{NULL} and
+#'   \code{silent} is \code{FALSE}, it defaults to \code{"txtprogressbar"}.
+#'   When \code{silent} is \code{TRUE},
+#'   the handler is set to \code{"void"}.
+#' @param restore.defaults Logical. If \code{TRUE} (default), the current
+#' \code{future} plan is saved and restored upon exit.
 #' @param full.update Logical, indicating whether to perform a full update of
 #' user information from INN. Default is FALSE.
 #' @param lang Language for localization ("nb", "nn", "no", or "en"). Defaults
@@ -55,13 +69,33 @@ CristinWeb <- function(monthlies,
                        archive.url = NULL,
                        local.storage = NULL,
                        user.cards = TRUE,
+                       use.multisession = TRUE,
+                       n.workers = NULL,
+                       n.chunks = NULL,
+                       handler = "cli",
+                       restore.defaults = FALSE,
                        full.update = FALSE,
                        lang = "nn",
                        silent = FALSE,
                        log = list()) {
 
+  # Return NULL if no monthlies
+  if (!any(nrow(monthlies))) {
+    return(NULL)
+  }
+
+  # Define workers and future session
+  process.type <- if (use.multisession) "multisession" else "sequential"
+  if (is.null(n.workers)) n.workers <- max(1, future::availableCores() - 1)
+  if (is.null(n.chunks)) n.chunks <- n.workers
+  if (use.multisession && !inherits(future::plan(), process.type)) {
+    future::plan(process.type, workers = n.workers)
+  } else {
+    future::plan(process.type)
+  }
+
   # Visible bindings
-  cristin.id <- inn.cards <- research.type <- research.design <- NULL
+  cristin.id <- inn.cards <- NULL
 
   # Languages
   # Set lang as nn if no
@@ -77,12 +111,9 @@ CristinWeb <- function(monthlies,
   # Function to create md files
   CreateMd <- function(item) {
 
-    # Visible bindings
-    title <- reference <- abstract <- contributors <- sdg <- archive <-
-      unpaywall <- ezproxy <- reference.button <- abstract.button <-
-      contributors.button <- sdg.button <- cristin.button <- zotero.button <-
-      archive.button <- unpaywall.button <- ezproxy.button <- keywords <-
-      keywords.button <- synopsis <- synopsis.button <- NULL
+    reference <- keywords.button <- synopsis.button <- synopsis <-
+      abstract.button <- abstract <- contributors.button <- contributors <-
+      unpaywall.button <- ezproxy.button <- sdg.button <- sdg <- NULL
 
     # Function to create a vector of collection names
     CollectionNames <- \(x) {
@@ -216,6 +247,7 @@ CristinWeb <- function(monthlies,
       )
     }
 
+
     # Archive
     tags <- c(
       CollectionNames(item$collection.names),
@@ -245,7 +277,7 @@ CristinWeb <- function(monthlies,
       )
     }
 
-    # Unpaywall
+    # Ezproxy
     if (any(!is.na(GoFish(item$ezproxy)))) {
       ezproxy.button <- htmltools::a(
         "EZproxy",
@@ -325,28 +357,37 @@ CristinWeb <- function(monthlies,
   }
 
 
-  # Markdownlist
-  markdowns <- list()
-  # Start time for query
-  query.start <- Sys.time()
-  # Cycle through monthlies and create markdowns
-  for (i in seq_len(nrow(monthlies))) {
-    markdowns[[i]] <- CreateMd(monthlies[i, ])
-    # Estimate time of arrival
-    log.eta <-
-      LogCat(
-        Eta(query.start,
-            i,
-            nrow(monthlies)),
-        silent = silent,
-        flush = TRUE,
-        log = log,
-        append.log = FALSE
-      )
+  limit <- 100
+  if ((nrow(monthlies) / limit) <= n.workers) {
+    monthlies.chunks <- SplitData(monthlies, chunks = n.chunks)
+  } else {
+    monthlies.chunks <- SplitData(monthlies, limit)
   }
 
-  # Create tibble
-  markdowns <- dplyr::bind_rows(markdowns)
+  monthlies.data <- ProcessData({
+    p <- progressr::progressor(steps = length(monthlies.chunks))
+    run <- future_lapply(monthlies.chunks, \(chunk) {
+      mds <- NULL
+      for (i in seq_len(nrow(chunk))) {
+        new.mds <- CreateMd(chunk[i,])
+        mds <- dplyr::bind_rows(mds, new.mds)
+      }
+      p(message = "Processing data...")
+      return (mds)
+    },
+    future.seed = TRUE)
+    dplyr::bind_rows(run)
+  },
+  n = nrow(monthlies),
+  use.multisession = use.multisession,
+  restore.defaults = restore.defaults,
+  handler = handler,
+  silent = silent,
+  )
 
-  return (markdowns)
+  log <- c(log, monthlies.data$log)
+  results <- monthlies.data$results
+
+  return(list(results = results, log = log))
+
 }

@@ -2,7 +2,8 @@
 #' @description This function generates HTML content for an email using data
 #' from Cristin.
 #' @param unit.id The key of the unit for which the email content is generated.
-#' @param cristin.monthly Data containing monthly information from Cristin.
+#' @param monthlies Data containing monthly information from Cristin.
+#' @param unit.paths Data containing the Zotero paths of Cristin units.
 #' @param archive.host Host of the archive.
 #' @param subject The subject of the email. If not provided, it will be
 #' generated based on the data.
@@ -40,7 +41,12 @@
 #'
 #'   # Create HTML email
 #'   if (any(nrow(example$monthlies))) {
-#'     example.mail <- CristinMail("209.5.10.0", example, "example.host")
+#'     example.mail <- CristinMail(
+#'     "209.5.10.0",
+#'     example$monthlies,
+#'     example$unit.paths
+#'     "example.host"
+#'    )
 #'
 #'     # Show subject
 #'     cat(example.mail$subject)
@@ -49,7 +55,8 @@
 #' @rdname CristinMail
 #' @export
 CristinMail <- \(unit.id,
-                 cristin.monthly,
+                 monthlies,
+                 unit.paths,
                  archive.host,
                  subject = NULL,
                  header = NULL,
@@ -70,11 +77,6 @@ CristinMail <- \(unit.id,
   if (lang %in% c("no")) lang <- "nn"
   # Set lang to en if not Norwegian
   if (!lang %in% c("nb", "nn", "no")) lang <- "en"
-
-  # Definitions
-  monthlies <- cristin.monthly$monthlies
-  unit.paths <- cristin.monthly$unit.paths
-
 
   # Function to add archive URL to publication
   AddAchive <- \(bib.item, key, lang) {

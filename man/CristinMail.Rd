@@ -6,7 +6,8 @@
 \usage{
 CristinMail(
   unit.id,
-  cristin.monthly,
+  monthlies,
+  unit.paths,
   archive.host,
   subject = NULL,
   header = NULL,
@@ -22,7 +23,9 @@ CristinMail(
 \arguments{
 \item{unit.id}{The key of the unit for which the email content is generated.}
 
-\item{cristin.monthly}{Data containing monthly information from Cristin.}
+\item{monthlies}{Data containing monthly information from Cristin.}
+
+\item{unit.paths}{Data containing the Zotero paths of Cristin units.}
 
 \item{archive.host}{Host of the archive.}
 
@@ -79,7 +82,12 @@ HTML format for email of selected units
 
   # Create HTML email
   if (any(nrow(example$monthlies))) {
-    example.mail <- CristinMail("209.5.10.0", example, "example.host")
+    example.mail <- CristinMail(
+    "209.5.10.0",
+    example$monthlies,
+    example$unit.paths
+    "example.host"
+   )
 
     # Show subject
     cat(example.mail$subject)

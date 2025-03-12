@@ -1,8 +1,10 @@
 #' @title Convert Cristin monthly data to JSON format
 #' @description This function converts the provided Cristin monthly data into
 #' JSON format, which can be used for various purposes.
-#' @param cristin.monthly A list containing the monthly data from Cristin,
-#' including bibliographic information.
+#' @param monthlies Data containing monthly information from Cristin.
+#' @param unit.paths Data containing the Zotero paths of Cristin units.
+#' @param sdg.data Data containing information about Sustainable Development
+#' Goals (SDGs). Default is NULL.
 #' @param local.storage Path to local storage directory. Default is NULL.
 #' @param user.cards Logical, indicating whether to update user information
 #' from INN. Default is TRUE.
@@ -34,7 +36,11 @@
 #'     c2z:::GoFish()
 #'
 #'   # Create json data
-#'   example.json <- CristinJson(example, user.cards = FALSE) |>
+#'   example.json <- CristinJson(
+#'     example$monthlies,
+#'     example$unit.paths,
+#'     user.cards = FALSE
+#'   ) |>
 #'     jsonlite::prettify() |>
 #'     c2z:::GoFish()
 #'
@@ -42,7 +48,9 @@
 #' }
 #' @rdname CristinJson
 #' @export
-CristinJson <- \(cristin.monthly,
+CristinJson <- \(monthlies,
+                 unit.paths,
+                 sdg.data = NULL,
                  local.storage = NULL,
                  user.cards = TRUE,
                  full.update = FALSE,
@@ -75,14 +83,10 @@ CristinJson <- \(cristin.monthly,
   # Set lang to en if not Norwegian
   if (!lang %in% c("nb", "nn", "no")) lang <- "en"
 
-  # Definitions
-  monthlies <- cristin.monthly$monthlies
-  unit.paths <- cristin.monthly$unit.paths
-
   # Define menu and link items
   menu <- tibble::tibble(
     startYear = min(monthlies$year),
-    sdgs = list(cristin.monthly$sdg.summary$sum),
+    sdgs = GoFish(list(sdg.data$sum), NULL),
     endYear = max(monthlies$year),
     nCollections = max(unit.paths$level),
     type = list(unique(monthlies$type)),

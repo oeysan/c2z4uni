@@ -5,7 +5,9 @@
 \title{Convert Cristin monthly data to JSON format}
 \usage{
 CristinJson(
-  cristin.monthly,
+  monthlies,
+  unit.paths,
+  sdg.data = NULL,
   local.storage = NULL,
   user.cards = TRUE,
   full.update = FALSE,
@@ -15,8 +17,12 @@ CristinJson(
 )
 }
 \arguments{
-\item{cristin.monthly}{A list containing the monthly data from Cristin,
-including bibliographic information.}
+\item{monthlies}{Data containing monthly information from Cristin.}
+
+\item{unit.paths}{Data containing the Zotero paths of Cristin units.}
+
+\item{sdg.data}{Data containing information about Sustainable Development
+Goals (SDGs). Default is NULL.}
 
 \item{local.storage}{Path to local storage directory. Default is NULL.}
 
@@ -63,7 +69,11 @@ JSON format
     c2z:::GoFish()
 
   # Create json data
-  example.json <- CristinJson(example, user.cards = FALSE) |>
+  example.json <- CristinJson(
+    example$monthlies,
+    example$unit.paths,
+    user.cards = FALSE
+  ) |>
     jsonlite::prettify() |>
     c2z:::GoFish()
 
