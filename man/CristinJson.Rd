@@ -58,7 +58,7 @@ JSON format
   example <- CristinMonthly(
     c2z::Zotero(
       id = "4827927",
-      api = "RqlAmlH5l1KPghfCseAq1sQ1",
+      api = "Io1bwAiOjB1jPgUNegjJhJxF",
       user = FALSE
     ),
     unit.id = "209.5.10.0",

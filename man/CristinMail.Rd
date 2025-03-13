@@ -68,7 +68,7 @@ HTML format for email of selected units
   example <- CristinMonthly(
     c2z::Zotero(
       id = "4827927",
-      api = "RqlAmlH5l1KPghfCseAq1sQ1",
+      api = "Io1bwAiOjB1jPgUNegjJhJxF",
       user = FALSE
     ),
     unit.id = "209.5.10.0",
@@ -85,7 +85,7 @@ HTML format for email of selected units
     example.mail <- CristinMail(
     "209.5.10.0",
     example$monthlies,
-    example$unit.paths
+    example$unit.paths,
     "example.host"
    )
 

@@ -95,7 +95,7 @@ CristinWeb <- function(monthlies,
   }
 
   # Visible bindings
-  cristin.id <- inn.cards <- NULL
+  cristin.id <- inn.cards <- research.type <- research.design <- NULL
 
   # Languages
   # Set lang as nn if no

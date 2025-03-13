@@ -3218,19 +3218,79 @@ SaveData <- \(data,
 #' @title CleanText
 #' @keywords internal
 #' @noRd
+CapitalLetters <- \(s) {
+  # Remove non-letter characters (e.g., spaces, punctuation, digits)
+  letters.only <- gsub("[^[:alpha:]]", "", s)
+  # Compare the filtered string with its uppercase version
+  return(letters.only == toupper(letters.only))
+}
+
+#' @title CleanText
+#' @keywords internal
+#' @noRd
+ApaTitle <- function(title) {
+  # Define a vector of "minor" words to keep in lower case
+  minor.words <- c("a", "an", "the", "and", "but", "or", "nor",
+                   "for", "so", "yet", "at", "around", "by", "after",
+                   "along", "from", "of", "on", "to", "with", "without", "in")
+
+  # Split the title into words
+  words <- unlist(strsplit(tolower(title), " "))
+  n <- length(words)
+
+  # Process each word
+  for (i in seq_along(words)) {
+    # Check for trailing punctuation (e.g., colon, comma, period)
+    punct <- ""
+    if (grepl("[[:punct:]]$", words[i])) {
+      punct <- substr(words[i], nchar(words[i]), nchar(words[i]))
+      words[i] <- substr(words[i], 1, nchar(words[i]) - 1)
+    }
+
+    # Determine if the word should be capitalized:
+    # Always capitalize if it's the first or last word,
+    # or if the previous word ended with a colon.
+    if (i == 1 || i == n || (i > 1 && substr(words[i - 1], nchar(words[i - 1]), nchar(words[i - 1])) == ":")) {
+      words[i] <- paste0(toupper(substr(words[i], 1, 1)), substr(words[i], 2, nchar(words[i])))
+    } else if (words[i] %in% minor.words) {
+      # Leave the word in lowercase if it is a minor word
+      # (already lowercased by the call to tolower())
+      words[i] <- words[i]
+    } else {
+      words[i] <- paste0(toupper(substr(words[i], 1, 1)), substr(words[i], 2, nchar(words[i])))
+    }
+
+    # Re-attach any trailing punctuation
+    words[i] <- paste0(words[i], punct)
+  }
+
+  # Combine the words back into a single string
+  return(paste(words, collapse = " "))
+}
+
+#' @title CleanText
+#' @keywords internal
+#' @noRd
 CleanText <- function(x, multiline = FALSE) {
 
   if (any(is.na(GoFish(x)))) return (x)
 
-  # Define unwanted characters to remove at the beginning and end.
-  unwanted_chars <- c(",", ":", ";", "-", "--", "\u2013", "\u2014",
-                      "\\[", "\\]", "\\{", "\\}", "=", "&", "/")
-  pattern_start <- paste0("^(", paste(unwanted_chars, collapse = "|"), ")+")
-  pattern_end   <- paste0("(", paste(unwanted_chars, collapse = "|"), ")+$")
+  # If the text is in ALL CAPS (allowing spaces), convert it to Title Case.
+  # Remove non-letter characters (e.g., spaces, punctuation, digits)
+  letters.only <- gsub("[^[:alpha:]]", "", x)
+  # Compare the filtered string with its uppercase version
+  if (all(letters.only == toupper(letters.only), na.rm = TRUE))  {
+    x <- ApaTitle(x)
+  }
 
-  # Remove unwanted characters from the beginning and end of the string.
-  x <- sub(pattern_start, "", x)
-  x <- sub(pattern_end, "", x)
+  # Define characters to remove
+  chars <- c(",", ":", ";", "-", "--", "\u2013", "\u2014", "[", "]", "{", "}",
+             "=", "&", "/")
+  # Create a regex pattern by escaping each character and joining them with |
+  pattern <- paste0("\\", chars, collapse = "|")
+
+  # Remove any unwanted characters from the beginning or end of the string
+  x <- gsub(paste0("^(", pattern, ")+|(", pattern, ")+$"), "", x)
 
   # Remove newline characters if multiline is set to FALSE.
   if (!multiline) {
@@ -3243,21 +3303,8 @@ CleanText <- function(x, multiline = FALSE) {
   # Remove the word "abstract" from the beginning (case-insensitive)
   x <- sub("(?i)^abstract\\b\\s*", "", x, perl = TRUE)
 
-  # If the text is in ALL CAPS (allowing spaces), convert it to Title Case.
-  if (grepl("^[[:upper:][:space:]]+$", x)) {
-    x <- stringr::str_to_title(x)
-  }
-
-  # Remove the literal string "NANA" if that's the entire string.
-  if (x == "NANA") {
-    x <- ""
-  }
-
   # Collapse multiple whitespace characters into a single space.
-  x <- gsub("\\s+", " ", x)
-
-  # Trim leading and trailing whitespace using Trim.
-  x <- Trim(x)
+  x <- Trim(gsub("\\s+", " ", x))
 
   return(x)
 

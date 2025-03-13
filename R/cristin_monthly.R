@@ -68,7 +68,8 @@
 #'     start.date = "2023-07",
 #'     post = TRUE,
 #'     silent = TRUE
-#'   )
+#'   ) |>
+#'   c2z:::GoFish(type = NULL)
 #'
 #'   # Print the three first individual pages (if any)
 #'   if (!is.null(example$monthlies)) {
