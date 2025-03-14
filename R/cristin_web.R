@@ -11,6 +11,8 @@
 #' from INN. Default is TRUE.
 #' @param use.multisession Logical. If \code{TRUE} (default), parallel
 #' processing using multisession is employed; otherwise, processing is sequential.
+#' @param min.multisession Minimum number of results for using multisession.
+#'   Default: 25
 #' @param n.workers Optional integer for the number of workers to be used in
 #' multisession mode. If \code{NULL}, it defaults to the number of available
 #' cores minus one (with a minimum of one).
@@ -45,7 +47,8 @@
 #'     unit.id = "209.5.10.0",
 #'     start.date = "2023-07",
 #'     post = TRUE,
-#'     silent = TRUE
+#'     silent = TRUE,
+#'     use.citeproc = FALSE,
 #'   )
 #'
 #'   # Create md files
@@ -69,7 +72,8 @@ CristinWeb <- function(monthlies,
                        archive.url = NULL,
                        local.storage = NULL,
                        user.cards = TRUE,
-                       use.multisession = TRUE,
+                       use.multisession = FALSE,
+                       min.multisession = 25,
                        n.workers = NULL,
                        n.chunks = NULL,
                        handler = "cli",
@@ -82,16 +86,6 @@ CristinWeb <- function(monthlies,
   # Return NULL if no monthlies
   if (!any(nrow(monthlies))) {
     return(NULL)
-  }
-
-  # Define workers and future session
-  process.type <- if (use.multisession) "multisession" else "sequential"
-  if (is.null(n.workers)) n.workers <- max(1, future::availableCores() - 1)
-  if (is.null(n.chunks)) n.chunks <- n.workers
-  if (use.multisession && !inherits(future::plan(), process.type)) {
-    future::plan(process.type, workers = n.workers)
-  } else {
-    future::plan(process.type)
   }
 
   # Visible bindings
@@ -307,7 +301,7 @@ CristinWeb <- function(monthlies,
     )
 
     md.html <- htmltools::tagList(
-      htmltools::h1(Dict("publications", lang)),
+      htmltools::h1(Dict("publication", lang)),
       htmltools::tagAppendChildren(
         # Reference
         reference,
@@ -356,37 +350,30 @@ CristinWeb <- function(monthlies,
     return (md)
   }
 
-
-  limit <- 100
-  if ((nrow(monthlies) / limit) <= n.workers) {
-    monthlies.chunks <- SplitData(monthlies, chunks = n.chunks)
-  } else {
-    monthlies.chunks <- SplitData(monthlies, limit)
-  }
-
-  monthlies.data <- ProcessData({
-    p <- progressr::progressor(steps = length(monthlies.chunks))
-    run <- future_lapply(monthlies.chunks, \(chunk) {
-      mds <- NULL
-      for (i in seq_len(nrow(chunk))) {
-        new.mds <- CreateMd(chunk[i,])
-        mds <- dplyr::bind_rows(mds, new.mds)
-      }
-      p(message = "Processing data...")
-      return (mds)
-    },
-    future.seed = TRUE)
-    dplyr::bind_rows(run)
-  },
-  n = nrow(monthlies),
-  use.multisession = use.multisession,
-  restore.defaults = restore.defaults,
-  handler = handler,
-  silent = silent,
+  start.message <- sprintf(
+    "Converting %s to HTML",
+    Numerus(
+      nrow(monthlies),
+      "item",
+    )
   )
 
-  log <- c(log, monthlies.data$log)
+  monthlies.data <- c2z::ProcessData(
+    data = monthlies,
+    func = CreateMd,
+    by.rows = TRUE,
+    min.multisession = min.multisession,
+    n.workers = n.workers,
+    n.chunks = n.chunks,
+    limit = 100,
+    use.multisession = use.multisession,
+    start.message = start.message,
+    handler = handler,
+    silent = silent
+  )
+
   results <- monthlies.data$results
+  log <- c(log, monthlies.data$log)
 
   return(list(results = results, log = log))
 

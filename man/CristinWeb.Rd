@@ -11,7 +11,8 @@ CristinWeb(
   archive.url = NULL,
   local.storage = NULL,
   user.cards = TRUE,
-  use.multisession = TRUE,
+  use.multisession = FALSE,
+  min.multisession = 25,
   n.workers = NULL,
   n.chunks = NULL,
   handler = "cli",
@@ -39,6 +40,9 @@ from INN. Default is TRUE.}
 
 \item{use.multisession}{Logical. If \code{TRUE} (default), parallel
 processing using multisession is employed; otherwise, processing is sequential.}
+
+\item{min.multisession}{Minimum number of results for using multisession.
+Default: 25}
 
 \item{n.workers}{Optional integer for the number of workers to be used in
 multisession mode. If \code{NULL}, it defaults to the number of available
@@ -90,7 +94,8 @@ markdown format
     unit.id = "209.5.10.0",
     start.date = "2023-07",
     post = TRUE,
-    silent = TRUE
+    silent = TRUE,
+    use.citeproc = FALSE,
   )
 
   # Create md files

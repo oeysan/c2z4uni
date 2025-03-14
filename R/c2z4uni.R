@@ -135,160 +135,102 @@ Dict <- function(x = NULL,
 #' @title ZoteroBib
 #' @keywords internal
 #' @noRd
-ZoteroBib <- \(items,
+ZoteroBib <- \(item,
                style = "apa-single-spaced",
                locale = "nn-NO",
                bibliography = TRUE,
                citations = TRUE,
-               linkwrap = 1,
-               limit = 10,
-               use.multisession = TRUE,
-               n.workers = NULL,
-               n.chunks = NULL,
-               handler = "cli",
-               restore.defaults = FALSE,
-               silent = FALSE,
-               log = list()) {
+               linkwrap = 1) {
 
   # Visible bindings
   results <- NULL
 
-  # Define workers and future session
-  process.type <- if (use.multisession) "multisession" else "sequential"
-  if (is.null(n.workers)) n.workers <- max(1, future::availableCores() - 1)
-  if (is.null(n.chunks)) n.chunks <- n.workers
-  if (use.multisession && !inherits(future::plan(), process.type)) {
-    future::plan(process.type, workers = n.workers)
-  } else {
-    future::plan(process.type)
-  }
-
   bibliography <- if (bibliography) 1 else 0
   citations <- if (citations) 1 else 0
 
-  GetBib <- \(x) {
+  # Convert Zotero item to json
+  json.data <- jsonlite::toJSON(item)
 
-    # Convert Zotero item to json
-    json.data <- jsonlite::toJSON(x)
+  # Fetch Zotero item in CSL-JSON format
+  httr.post <- Online(
+    httr::RETRY(
+      "POST",
+      "http://localhost:1969/export?format=csljson",
+      body = json.data,
+      httr::add_headers("Content-Type" = "application/json"),
+      quiet = TRUE
+    ),
+    silent = TRUE
+  )
 
-    # Fetch Zotero item in CSL-JSON format
-    httr.post <- Online(
-      httr::RETRY(
-        "POST",
-        "http://localhost:1969/export?format=csljson",
-        body = json.data,
-        httr::add_headers("Content-Type" = "application/json"),
-        quiet = TRUE
-      ),
-      silent = TRUE
-    )
-
-    if (httr.post$error) {
-      return (NULL)
-    }
-
-    json.data <- jsonlite::toJSON(
-      list(items =  ParseUrl(httr.post$data, as = "parsed")),
-      auto_unbox = TRUE
-    )
-
-    query.list <- list(
-      responseformat = "json",
-      style = style,
-      locale = locale,
-      bibliography = bibliography,
-      citations = citations,
-      linkwrap = linkwrap
-    )
-
-    httr.post <- Online(
-      httr::RETRY(
-        "POST",
-        "http://localhost:8085",
-        body = json.data,
-        query = query.list,
-        httr::add_headers("Content-Type" = "application/json"),
-        quiet = TRUE
-      ),
-      silent = TRUE
-    )
-
-    if (httr.post$error) {
-      return (NULL)
-    }
-
-    json.parsed <- ParseUrl(httr.post$data, as = "parsed")
-
-    # Extract bibliography metadata and the single bibliography entry
-    bib.meta  <- GoFish(json.parsed$bibliography[[1]])
-    bib.item  <- GoFish(json.parsed$bibliography[[2]][[1]])
-
-    bib.full <- paste0(
-      bib.meta$bibstart,
-      bib.item,
-      bib.meta$bibend
-    ) |>
-      GoFish()
-
-    # Wrap the citation text in a <span> tag
-    citation.full <- sprintf(
-      "<span>%s</span>",
-      json.parsed$citations[[1]][2]
-    ) |>
-      GoFish()
-
-    bib.body <- paste0(bib.meta$bibstart, "%s" , bib.meta$bibend) |>
-      GoFish()
-
-    result <- tibble::tibble(
-      bib        = Trim(bib.full),
-      citation   = Trim(citation.full),
-      bib.body   = Trim(bib.body),
-      bib.item   = Trim(bib.item)
-    )
-
-    return (result)
-
+  if (httr.post$error) {
+    return (NULL)
   }
 
-  if (any(nrow(items))) {
+  json.data <- jsonlite::toJSON(
+    list(items =  ParseUrl(httr.post$data, as = "parsed")),
+    auto_unbox = TRUE
+  )
 
-    if ((nrow(items) / limit) <= n.workers) {
-      bib.chunks <- SplitData(items, chunks = n.chunks)
-    } else {
-      bib.chunks <- SplitData(items, limit)
-    }
+  query.list <- list(
+    responseformat = "json",
+    style = style,
+    locale = locale,
+    bibliography = bibliography,
+    citations = citations,
+    linkwrap = linkwrap
+  )
 
-    bib.items <- ProcessData({
-      p <- progressr::progressor(steps = length(bib.chunks))
-      run <- future_lapply(bib.chunks, \(chunk) {
-        bibs <- NULL
-        for (i in seq_len(nrow(chunk))) {
-          new.bib <- tibble::tibble(
-            key = chunk$key[[i]],
-            version = chunk$version[[i]],
-            GetBib(chunk[i, ])
-          )
-          bibs <- dplyr::bind_rows(bibs, new.bib)
-        }
-        p(message = "Processing data...")
-        return (bibs)
-      },
-      future.seed = TRUE)
-      dplyr::bind_rows(run)
-    },
-    n = nrow(items),
-    use.multisession = use.multisession,
-    restore.defaults = restore.defaults,
-    handler = handler,
-    silent = silent,
-    )
+  httr.post <- Online(
+    httr::RETRY(
+      "POST",
+      "http://localhost:8085",
+      body = json.data,
+      query = query.list,
+      httr::add_headers("Content-Type" = "application/json"),
+      quiet = TRUE
+    ),
+    silent = TRUE
+  )
 
-    log <- c(log, bib.items$log)
-    results <- bib.items$results
+  if (httr.post$error) {
+    return (NULL)
   }
 
-  return(list(results = results, log = log))
+  json.parsed <- ParseUrl(httr.post$data, as = "parsed")
+
+  # Extract bibliography metadata and the single bibliography entry
+  bib.meta  <- GoFish(json.parsed$bibliography[[1]])
+  bib.item  <- GoFish(json.parsed$bibliography[[2]][[1]])
+
+  bib.full <- paste0(
+    bib.meta$bibstart,
+    bib.item,
+    bib.meta$bibend
+  ) |>
+    GoFish()
+
+  # Wrap the citation text in a <span> tag
+  citation.full <- sprintf(
+    "<span>%s</span>",
+    json.parsed$citations[[1]][2]
+  ) |>
+    GoFish()
+
+  bib.body <- paste0(bib.meta$bibstart, "%s" , bib.meta$bibend) |>
+    GoFish()
+
+  result <- tibble::tibble(
+    key        = item$key,
+    version    = item$version,
+    bib        = Trim(bib.full),
+    citation   = Trim(citation.full),
+    bib.body   = Trim(bib.body),
+    bib.item   = Trim(bib.item)
+  )
+
+  return (result)
+
 }
 
 #' @title LocalStorage
@@ -696,46 +638,53 @@ UnlinkItems <- \(remove.keys,
   if (items || bibliography) monthlies <- TRUE
   if (monthlies) extras <- TRUE
 
-  ProcessRds <- \(path, remove.keys) {
-    path <- file.path(local.storage, paste0(path, ".rds"))
-    data <- GoFish(readRDS(path))
-    if (any(nrow(data))) {
-      data <- dplyr::filter(data, !key %in% remove.keys)
-      saveRDS(data, path)
-    }
-  }
-
+  # Update the updated_keys file if items is FALSE
   if (!items) {
-    updated.keys.path <- file.path(local.storage, "updated_keys.rds")
-    updated.keys <- GoFish(readRDS(updated.keys.path))
+    updated.keys <- GoFish(LocalStorage("updated_keys", local.storage, data = NULL))
     new.keys <- unique(c(updated.keys, remove.keys))
-    saveRDS(new.keys, updated.keys.path)
+    LocalStorage("updated_keys", local.storage, data = new.keys, lang = lang)
   }
 
-  if (items) ProcessRds("items", remove.keys)
+  # Helper function to process an RDS file using LocalStorage.
+  # The 'name' parameter is the base file name; if a language is provided,
+  # LocalStorage will append it to the name (e.g., "bibliography" becomes
+  # bibliography_en.rds" for lang = "en").
+  ProcessRds <- \(name, remove.keys, lang = NULL) {
+    data <- GoFish(LocalStorage(name, local.storage, data = NULL, lang = lang))
+    if (nrow(data) > 0) {
+      data <- dplyr::filter(data, !key %in% remove.keys)
+      LocalStorage(name, local.storage, data = data, lang = lang)
+    }
+    return(data)
+  }
 
+  # Process items if needed
+  if (items) {
+    ProcessRds("items", remove.keys)
+  }
+
+  # Process bibliography files for each supported language
   if (bibliography) {
     for (lang in supported.lang) {
-      ProcessRds(paste0("bibliography_", lang), remove.keys)
+      ProcessRds("bibliography", remove.keys, lang = lang)
     }
   }
 
+  # Process monthlies files for each supported language
   if (monthlies) {
     for (lang in supported.lang) {
-      ProcessRds(paste0("monthlies_", lang), remove.keys)
+      ProcessRds("monthlies", remove.keys, lang = lang)
     }
   }
 
+  # Process extras: update monthlies_extras and sdg_predictions, then update the summary
   if (extras) {
     ProcessRds("monthlies_extras", remove.keys)
     data <- ProcessRds("sdg_predictions", remove.keys)
-    saveRDS(
-      SdgSummary(data),
-      file.path(local.storage, "sdg_predictiomers_summary.rds")
-    )
+    LocalStorage("sdg_predictiomers_summary", local.storage, data = SdgSummary(data))
   }
-
 }
+
 
 #' @title Numerus
 #' @keywords internal
@@ -1068,7 +1017,9 @@ CreateMonthlies <- \(zotero,
                      unit.paths,
                      collections,
                      full.update,
+                     use.citeproc,
                      use.multisession,
+                     min.multisession,
                      n.workers,
                      n.chunks,
                      handler,
@@ -1244,59 +1195,94 @@ CreateMonthlies <- \(zotero,
     # Updated keys
     updated.keys <- new.keys
 
-    limit <- 100
-    new.keys <- tibble::tibble(key = updated.keys)
-    if ((nrow(new.keys) / limit) <= n.workers) {
-      zotero.chunks <- SplitData(new.keys, chunks = n.chunks)
-    } else {
-      zotero.chunks <- SplitData(new.keys, limit)
-    }
-
-    start.message <- sprintf("Fetching %s from Zotero library",
-                             Numerus(nrow(new.keys), "item"))
-
-    zotero.items <- ProcessData(
-      {
-        p <- progressr::progressor(steps = length(zotero.chunks))
-        run <- future_lapply(zotero.chunks, \(chunk) {
-
-          chunk <- c2z::ZoteroGet(
-            zotero,
-            item.keys = chunk$key,
-            item.type = "-attachment || note",
-            silent = TRUE,
-            force = TRUE,
-            use.collection = FALSE
-          )$results
-
-          p(message = "Processing data...")
-
-          return (GoFish(chunk, NULL))
-        },
-        future.seed = TRUE)
-        dplyr::bind_rows(run)
-      },
-      start.message = start.message,
-      use.multisession = use.multisession,
-      restore.defaults = restore.defaults,
-      handler = handler,
-      silent = silent,
+    new.keys <- tibble::tibble(key = new.keys)
+    start.message <- sprintf(
+      "Fetching %s from Zotero library",
+      Numerus(
+        nrow(new.keys),
+        "item",
+      )
     )
-    log <- c(log, zotero.items$log)
+    zotero.data <- c2z::ProcessData(
+      data = new.keys,
+      func = \(data) {
+        c2z::ZoteroGet(
+          zotero,
+          item.keys = data$key,
+          item.type = "-attachment || note",
+          silent = TRUE,
+          force = TRUE,
+          use.collection = FALSE
+        )$results
+      },
+      by.rows = FALSE,
+      min.multisession = min.multisession,
+      n.workers = n.workers,
+      n.chunks = n.chunks,
+      limit = 100,
+      use.multisession = use.multisession,
+      start.message = start.message,
+      handler = handler,
+      silent = silent
+    )
+
+    log <- c(log, zotero.data$log)
 
     # Update items
-    items <- UpdateInsert(items, zotero.items$results)
+    items <- UpdateInsert(items, zotero.data$results)
+
+    # Use local server for creating bibliography
+    if (use.citeproc) {
+
+      start.message <- sprintf(
+        "Creating bibliography for %s",
+        Numerus(
+          nrow(zotero.data$results),
+          "item",
+        )
+      )
+
+      new.bibliography <- c2z::ProcessData(
+        data = zotero.data$results,
+        func = \(data) {
+          ZoteroBib(
+            item = data,
+            style = style,
+            locale = locale
+          )
+        },
+        by.rows = TRUE,
+        min.multisession = min.multisession,
+        n.workers = n.workers,
+        n.chunks = n.chunks,
+        limit = 100,
+        use.multisession = use.multisession,
+        start.message = start.message,
+        handler = handler,
+        silent = silent
+      )
+
+      log <- c(log, new.bibliography$log)
+      new.bibliography <- new.bibliography$results
+
+      # Else collect bibliography from Zotero
+    } else {
+
+      # Update bibliography
+      new.bibliography <- c2z::ZoteroGet(
+        zotero,
+        item.keys = zotero.data$results$key,
+        item.type = "-attachment || note",
+        library.type = "data,bib,citation",
+        force = TRUE,
+        use.collection = FALSE
+      )
+      log <- c(log, new.bibliography$log)
+      new.bibliography <- new.bibliography$bibliography
+    }
 
     # Update bibliography
-    new.bibliography <- ZoteroBib(
-      zotero.items$results,
-      style = style,
-      locale = locale,
-      use.multisession = use.multisession
-    )
-
-    # Update bibliography
-    bibliography <- UpdateInsert(bibliography, new.bibliography$results) |>
+    bibliography <- UpdateInsert(bibliography, new.bibliography) |>
       dplyr::arrange(match(key, items$key))
 
     # Arrange bibliography according to items
@@ -1322,12 +1308,6 @@ CreateMonthlies <- \(zotero,
           cristin.id = ZoteroId("Cristin", extra)
         )
 
-      limit <- 100
-      if ((nrow(new.monthlies) / limit) <= n.workers) {
-        bib.chunks <- SplitData(new.monthlies, chunks = n.chunks)
-      } else {
-        bib.chunks <- SplitData(new.monthlies, limit)
-      }
 
       start.message <- sprintf(
         "Creating %s",
@@ -1338,32 +1318,29 @@ CreateMonthlies <- \(zotero,
         )
       )
 
-      bib.items <- ProcessData(
-        {
-          p <- progressr::progressor(steps = length(bib.chunks))
-          run <- future_lapply(bib.chunks, \(chunk) {
-
-            chunk <- EnhanceBib(
-              chunk,
-              collections,
-              unit.paths,
-              silent
-            )
-
-            p(message = "Processing data...")
-
-            return (chunk)
-          },
-          future.seed = TRUE)
-          dplyr::bind_rows(run)
+      bib.items <- c2z::ProcessData(
+        data = new.monthlies,
+        func = \(data) {
+          EnhanceBib(
+            data,
+            collections,
+            unit.paths,
+            TRUE
+          )
         },
-        start.message = start.message,
+        by.rows = TRUE,
+        min.multisession = min.multisession,
+        n.workers = n.workers,
+        n.chunks = n.chunks,
+        limit = 100,
         use.multisession = use.multisession,
-        restore.defaults = restore.defaults,
+        start.message = start.message,
         handler = handler,
-        silent = silent,
+        silent = silent
       )
+
       log <- c(log, bib.items$log)
+      new.bibliography <- bib.items$results
 
       # Update or insert items
       monthlies <- UpdateInsert(monthlies, bib.items$results) |>
@@ -1953,23 +1930,13 @@ InnUsers <- \(i = 1,
               get.cards = TRUE,
               limit = 10,
               use.multisession = TRUE,
+              min.multisession = 10,
               n.workers = NULL,
               n.chunks = NULL,
               handler = "cli",
               restore.defaults = FALSE,
               silent = FALSE,
               log = list()) {
-
-
-  # Define workers and future session
-  process.type <- if (use.multisession) "multisession" else "sequential"
-  if (is.null(n.workers)) n.workers <- max(1, future::availableCores() - 1)
-  if (is.null(n.chunks)) n.chunks <- n.workers
-  if (use.multisession && !inherits(future::plan(), process.type)) {
-    future::plan(process.type, workers = n.workers)
-  } else {
-    future::plan(process.type)
-  }
 
   UpdateCard <- \(x, y) {
 
@@ -2087,106 +2054,59 @@ InnUsers <- \(i = 1,
   users <- users$users |>
     tidyr::drop_na()
 
-  # Add cristin id if get.cristin = TRUE
-  if (get.cristin && any(nrow(users))) {
+  CardExtras <- \(users) {
 
-    if ((nrow(users) / limit) <= n.workers) {
-      users.chunks <- SplitData(users, chunks = n.chunks)
-    } else {
-      users.chunks <- SplitData(users, limit)
+    # Add cristin id if get.cristin = TRUE
+    if (get.cristin && any(nrow(users))) {
+      users <- users |>
+        dplyr::mutate(
+          cristin.id = purrr::map_chr(
+            full.name, ~ CristinName(.x)
+          )
+        ) |>
+        dplyr::filter(!is.na(cristin.id)) |>
+        dplyr::distinct(cristin.id, .keep_all = TRUE)
     }
-
-    start.message <- sprintf("Finding Cristin id for %s.",
-                             Numerus(nrow(users), "user"))
-
-    users.data <- ProcessData({
-      p <- progressr::progressor(steps = length(users.chunks))
-      run <- future_lapply(users.chunks, \(chunk) {
-
-        users <- chunk |>
-          dplyr::mutate(
-            cristin.id = purrr::map_chr(
-              full.name, ~ CristinName(.x)
-            )
-          ) |>
-          dplyr::filter(!is.na(cristin.id)) |>
-          dplyr::distinct(cristin.id, .keep_all = TRUE)
-
-
-        p(message = "Processing data...")
-        return (users)
-      },
-      future.seed = TRUE)
-      dplyr::bind_rows(run)
-    },
-    start.message = start.message,
-    use.multisession = use.multisession,
-    restore.defaults = restore.defaults,
-    handler = handler,
-    silent = silent,
-    )
-
-    log <- c(log, users.data$log)
-    users <- users.data$results
-
+    # Add user cards at INN if get.cards is TRUE
+    if (get.cristin && get.cards && any(nrow(users))) {
+      users <- users |>
+        dplyr::mutate(
+          card = purrr::map_chr(
+            url, ~ InnCards(.x),
+            .progress = !silent
+          ),
+          card = purrr::pmap_chr(
+            list(card, cristin.id), ~
+              UpdateCard(.x, .y)
+          )
+        ) |>
+        dplyr::filter(!is.na(card))
+    }
   }
 
-  # Add user cards at INN if get.cards is TRUE
-  if (get.cristin && get.cards && any(nrow(users))) {
-
-    log <-  LogCat(
-      "Finding business cards at INN.no",
-      silent = silent,
-      log = log
+  start.message <- sprintf(
+    "Updating %s",
+    Numerus(
+      nrow(users),
+      "user card",
     )
+  )
 
-    if ((nrow(users) / limit) <= n.workers) {
-      users.chunks <- SplitData(users, chunks = n.chunks)
-    } else {
-      users.chunks <- SplitData(users, limit)
-    }
-
-    start.message <- sprintf(
-      "Finding business cards at INN.no for %s.",
-      Numerus(nrow(users), "user")
-    )
-
-    users.data <- ProcessData({
-      p <- progressr::progressor(steps = length(users.chunks))
-      run <- future_lapply(users.chunks, \(chunk) {
-
-        users <- chunk |>
-          dplyr::mutate(
-            card = purrr::map_chr(
-              url, ~ InnCards(.x),
-              .progress = !silent
-            ),
-            card = purrr::pmap_chr(
-              list(card, cristin.id), ~
-                UpdateCard(.x, .y)
-            )
-          ) |>
-          dplyr::filter(!is.na(card))
-
-        p(message = "Processing data...")
-        return (users)
-      },
-      future.seed = TRUE)
-      dplyr::bind_rows(run)
-    },
-    start.message = start.message,
+  users <- c2z::ProcessData(
+    data = users,
+    func = CardExtras,
+    by.rows = FALSE,
+    min.multisession = min.multisession,
+    n.workers = n.workers,
+    n.chunks = n.chunks,
+    limit = 20,
     use.multisession = use.multisession,
-    restore.defaults = restore.defaults,
+    start.message = start.message,
     handler = handler,
-    silent = silent,
-    )
+    silent = silent
+  )
 
-    log <- c(log, users.data$log)
-    users <- users.data$results
-
-  }
-
-  return (users)
+  return (users$results)
 
 }
 

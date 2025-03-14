@@ -148,7 +148,7 @@
     },
     "c2z": {
       "Package": "c2z",
-      "Version": "0.3.0.9003",
+      "Version": "0.3.0.9009",
       "Source": "GitHub",
       "Type": "Package",
       "Title": "A Reference Manager",
@@ -196,7 +196,7 @@
       "RemoteUsername": "oeysan",
       "RemotePkgRef": "oeysan/c2z",
       "RemoteRef": "HEAD",
-      "RemoteSha": "5a5d36804bfa213d4efd3a9e9e5bf103ba06b02a",
+      "RemoteSha": "eb73d96b1fff0b012a6eec9db8a9bb0025b06065",
       "NeedsCompilation": "no",
       "Author": "Øystein Olav Skaar [aut, cre, cph] (<https://orcid.org/0000-0001-5605-3492>)"
     },

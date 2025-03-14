@@ -8,6 +8,22 @@
 #' @param local.storage Path to local storage directory. Default is NULL.
 #' @param user.cards Logical, indicating whether to update user information
 #' from INN. Default is TRUE.
+#' @param use.multisession Logical. If \code{TRUE} (default), parallel
+#' processing using multisession is employed; otherwise, processing is sequential.
+#' @param min.multisession Minimum number of results for using multisession.
+#'   Default: 25
+#' @param n.workers Optional integer for the number of workers to be used in
+#' multisession mode. If \code{NULL}, it defaults to the number of available
+#' cores minus one (with a minimum of one).
+#' @param n.chunks Optional integer for the number of chunks to process.
+#' If \code{NULL}, it defaults to the number of workers.
+#' @param handler The progress handler to be used by the \code{progressr}
+#' package. If \code{NULL} and
+#'   \code{silent} is \code{FALSE}, it defaults to \code{"txtprogressbar"}.
+#'   When \code{silent} is \code{TRUE},
+#'   the handler is set to \code{"void"}.
+#' @param restore.defaults Logical. If \code{TRUE} (default), the current
+#' \code{future} plan is saved and restored upon exit.
 #' @param full.update Logical, indicating whether to perform a full update of
 #' user information from INN. Default is FALSE.
 #' @param lang Language for localization ("nb", "nn", "no", or "en"). Defaults
@@ -31,7 +47,8 @@
 #'     unit.id = "209.5.10.0",
 #'     start.date = "2023-07",
 #'     post = TRUE,
-#'     silent = TRUE
+#'     silent = TRUE,
+#'     use.citeproc = FALSE
 #'   ) |>
 #'     c2z:::GoFish()
 #'
@@ -53,6 +70,12 @@ CristinJson <- \(monthlies,
                  sdg.data = NULL,
                  local.storage = NULL,
                  user.cards = TRUE,
+                 use.multisession = FALSE,
+                 min.multisession = 25,
+                 n.workers = NULL,
+                 n.chunks = NULL,
+                 handler = "cli",
+                 restore.defaults = FALSE,
                  full.update = FALSE,
                  lang = "nn",
                  silent = FALSE,
@@ -114,29 +137,56 @@ CristinJson <- \(monthlies,
     inn.cards <- GetCards(local.storage, full.update, lang, silent)
   } # End user.cards
 
-  # Create items
-  items <- monthlies |>
-    dplyr::transmute(
-      key,
-      cristinId = cristin.id,
-      type,
-      html = bib.item,
-      contributors = purrr::map(
-        cristin.ids, ~
-          CreateContributors(.x, inn.cards),
-        .progress = !silent
-      ),
-      abstract,
-      title,
-      year,
-      month,
-      collections,
-      sdg,
-      synopsis,
-      keywords = GoFish(Map(c, research.type, research.design, keywords)),
-      unpaywall = GoFish(unpaywall),
-      ezproxy = GoFish(ezproxy)
+
+  CreateJsonItems <- \(data, silent = TRUE) {
+    data |>
+      dplyr::transmute(
+        key,
+        cristinId = cristin.id,
+        type,
+        html = bib.item,
+        contributors = purrr::map(
+          cristin.ids, ~
+            CreateContributors(.x, inn.cards),
+          .progress = !silent
+        ),
+        abstract,
+        title,
+        year,
+        month,
+        collections,
+        sdg,
+        synopsis,
+        keywords = GoFish(Map(c, research.type, research.design, keywords)),
+        unpaywall = GoFish(unpaywall),
+        ezproxy = GoFish(ezproxy)
+      )
+  }
+
+  start.message <- sprintf(
+    "Converting %s to JSON",
+    Numerus(
+      nrow(monthlies),
+      "item",
     )
+  )
+
+  monthlies.data <- c2z::ProcessData(
+    data = monthlies,
+    func = CreateJsonItems,
+    by.rows = FALSE,
+    min.multisession = min.multisession,
+    n.workers = n.workers,
+    n.chunks = n.chunks,
+    limit = 50,
+    use.multisession = use.multisession,
+    start.message = start.message,
+    handler = handler,
+    silent = silent
+  )
+
+  items <- monthlies.data$results
+  log <- c(log, monthlies.data$log)
 
   # Create json data
   json <- jsonlite::toJSON(list(

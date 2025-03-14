@@ -34,6 +34,7 @@
 #'     start.date = "2023-07",
 #'     post = TRUE,
 #'     silent = FALSE,
+#'     use.citeproc = FALSE,
 #'     use.identifiers = FALSE,
 #'     get.unpaywall = FALSE,
 #'     get.ezproxy = FALSE
