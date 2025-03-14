@@ -133,6 +133,13 @@ CristinUnits <- \(unit.id,
     ) |>
     dplyr::distinct()
 
+
+  # Add name column
+  units <- units |>
+    dplyr::mutate(
+      name = purrr::map_chr(core, ~ tail(.x, 1))
+    )
+
   return(units)
 
 }

@@ -476,17 +476,20 @@ CristinMonthly <- \(zotero,
     new.items <- cristin.data$results
 
     # Make sure that new items has a unique key.
-    new.items <- new.items |>
-      # Filter out NA items
-      AddMissing(missing.names = c("itemType", "extra")) |>
-      dplyr::filter(!is.na(itemType) | !is.na(extra)) |>
-      dplyr::mutate(
-        key = replace(
-          key,
-          version == 0,
-          purrr::map_chr(which(version == 0), ~ZoteroKey())
+
+    if (any(GoFish(duplicated(cristin$results$key), FALSE))) {
+      new.items <- new.items |>
+        # Filter out NA items
+        AddMissing(missing.names = c("itemType", "extra")) |>
+        dplyr::filter(!is.na(itemType) | !is.na(extra)) |>
+        dplyr::mutate(
+          key = replace(
+            key,
+            version == 0,
+            purrr::map_chr(which(version == 0), ~ZoteroKey())
+          )
         )
-      )
+    }
 
     # Find multidepartmental and duplicate items if any items
     if (any(nrow(new.items))) {
@@ -640,11 +643,6 @@ CristinMonthly <- \(zotero,
           dplyr::everything(), ~
             replace(.x, .x == Dict("affiliation", lang), NA)
         ),
-        name = pmap_chr(
-          dplyr::across(dplyr::starts_with("path")), ~ {
-            tail(na.omit(c(...)), 1)
-          }
-        )
       ) |>
       dplyr::select(id, name)
 
