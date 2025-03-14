@@ -40,7 +40,7 @@ selected units
 \donttest{
 # Find units for Inland University
   CristinUnits("209.0.0.0") |>
-    dplyr::select(id, path2) |>
+    dplyr::select(id, name) |>
     print(width = 80)
 }
 }

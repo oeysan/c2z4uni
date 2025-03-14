@@ -15,7 +15,7 @@
 #' \donttest{
 #' # Find units for Inland University
 #'   CristinUnits("209.0.0.0") |>
-#'     dplyr::select(id, path2) |>
+#'     dplyr::select(id, name) |>
 #'     print(width = 80)
 #' }
 #' @seealso
@@ -134,12 +134,18 @@ CristinUnits <- \(unit.id,
     dplyr::distinct()
 
 
-  # Add name column
   units <- units |>
     dplyr::mutate(
+      core = purrr::pmap(
+        dplyr::select(units, dplyr::starts_with("path")),
+        function(...) {
+          x <- c(...)
+          x[!is.na(x)]
+        }
+      ),
+      core = purrr::map(core, ~ .x[!stringr::str_detect(.x, "Affiliated")]),
       name = purrr::map_chr(core, ~ tail(.x, 1))
     )
 
-  return(units)
-
+  return (units)
 }
