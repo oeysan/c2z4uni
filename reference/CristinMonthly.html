@@ -19,7 +19,7 @@ Faculties -&amp;gt; Departments -&amp;gt; Groups)."><!-- mathjax --><script src=
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9003</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9004</span>
       </span>
     </div>
 
@@ -77,10 +77,12 @@ Faculties -&gt; Departments -&gt; Groups).</p>
 <span>  check.items <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  use.identifiers <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  use.multisession <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  min.multisession <span class="op">=</span> <span class="fl">25</span>,</span>
 <span>  n.workers <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  n.chunks <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  handler <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  restore.defaults <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  use.citeproc <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  full.update <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  lang <span class="op">=</span> <span class="st">"nn"</span>,</span>
 <span>  post.lang <span class="op">=</span> <span class="st">"nn"</span>,</span>
@@ -181,6 +183,11 @@ publications, Default: TRUE</p></dd>
 processing using multisession is employed; otherwise, processing is sequential.</p></dd>
 
 
+<dt id="arg-min-multisession">min.multisession<a class="anchor" aria-label="anchor" href="#arg-min-multisession"></a></dt>
+<dd><p>Minimum number of results for using multisession.
+Default: 25</p></dd>
+
+
 <dt id="arg-n-workers">n.workers<a class="anchor" aria-label="anchor" href="#arg-n-workers"></a></dt>
 <dd><p>Optional integer for the number of workers to be used in
 multisession mode. If <code>NULL</code>, it defaults to the number of available
@@ -205,9 +212,14 @@ package. If <code>NULL</code> and
 <code>future</code> plan is saved and restored upon exit.</p></dd>
 
 
+<dt id="arg-use-citeproc-">use.citeproc, <a class="anchor" aria-label="anchor" href="#arg-use-citeproc-"></a></dt>
+<dd><p>Use local citeproc and translator to create bibliography,
+Default: FALSE</p></dd>
+
+
 <dt id="arg-full-update">full.update<a class="anchor" aria-label="anchor" href="#arg-full-update"></a></dt>
 <dd><p>Update bibliography for all items in library,
-Default: FALSE</p></dd>
+Default: FALSE'</p></dd>
 
 
 <dt id="arg-lang">lang<a class="anchor" aria-label="anchor" href="#arg-lang"></a></dt>

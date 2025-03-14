@@ -18,7 +18,7 @@ display using data from Cristin."><!-- mathjax --><script src="https://cdnjs.clo
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9003</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9004</span>
       </span>
     </div>
 
@@ -62,7 +62,8 @@ display using data from Cristin.</p>
 <span>  archive.url <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  local.storage <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  user.cards <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  use.multisession <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  use.multisession <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  min.multisession <span class="op">=</span> <span class="fl">25</span>,</span>
 <span>  n.workers <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  n.chunks <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  handler <span class="op">=</span> <span class="st">"cli"</span>,</span>
@@ -107,6 +108,11 @@ from INN. Default is TRUE.</p></dd>
 <dt id="arg-use-multisession">use.multisession<a class="anchor" aria-label="anchor" href="#arg-use-multisession"></a></dt>
 <dd><p>Logical. If <code>TRUE</code> (default), parallel
 processing using multisession is employed; otherwise, processing is sequential.</p></dd>
+
+
+<dt id="arg-min-multisession">min.multisession<a class="anchor" aria-label="anchor" href="#arg-min-multisession"></a></dt>
+<dd><p>Minimum number of results for using multisession.
+Default: 25</p></dd>
 
 
 <dt id="arg-n-workers">n.workers<a class="anchor" aria-label="anchor" href="#arg-n-workers"></a></dt>
@@ -175,10 +181,9 @@ markdown format</p>
 <span class="r-in"><span>    unit.id <span class="op">=</span> <span class="st">"209.5.10.0"</span>,</span></span>
 <span class="r-in"><span>    start.date <span class="op">=</span> <span class="st">"2023-07"</span>,</span></span>
 <span class="r-in"><span>    post <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>    silent <span class="op">=</span> <span class="cn">TRUE</span></span></span>
+<span class="r-in"><span>    silent <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>    use.citeproc <span class="op">=</span> <span class="cn">FALSE</span>,</span></span>
 <span class="r-in"><span>  <span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>first element used of 'length.out' argument</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>data length is not a multiple of split variable</span>
 <span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in if (count == 1) singularis else pluralis:</span> argument is of length zero</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>  <span class="co"># Create md files</span></span></span>
