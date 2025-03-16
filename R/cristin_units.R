@@ -91,35 +91,34 @@ CristinUnits <- \(unit.id,
     }
   }
 
-  # Return if !subunits | "subunits" %in% names(units.data)
-  if (!subunits | !"subunits" %in% names(units.data)) {
-    return (units)
-  }
+  # Check if unit has subunits
+  if (subunits && "subunits" %in% names(units.data)) {
 
-  # Else add subunits
-  units <- dplyr::bind_rows(
-    units,
-    units.data$subunits |>
-      tibble::as_tibble() |>
-      dplyr::transmute(
-        id = cristin_unit_id,
-        !!paste0("path", ncol(units)-2) := unlist(unit_name)
-      )
-  ) |>
-    tidyr::fill(dplyr::starts_with("path"))
-
-  # Add nested sub units if recursive is TRUE
-  if (recursive) {
+    # Else add subunits
     units <- dplyr::bind_rows(
-      units[1, ],
-      lapply(seq_len(nrow(units))[-1], \(i) {
-        CristinUnits(
-          units[i, ]$id,
-          subunits = TRUE,
-          recursive = TRUE,
-          lang = lang)
-      })
-    )
+      units,
+      units.data$subunits |>
+        tibble::as_tibble() |>
+        dplyr::transmute(
+          id = cristin_unit_id,
+          !!paste0("path", ncol(units)-2) := unlist(unit_name)
+        )
+    ) |>
+      tidyr::fill(dplyr::starts_with("path"))
+
+    # Add nested subunits if recursive is TRUE
+    if (recursive) {
+      units <- dplyr::bind_rows(
+        units[1, ],
+        lapply(seq_len(nrow(units))[-1], \(i) {
+          CristinUnits(
+            units[i, ]$id,
+            subunits = TRUE,
+            recursive = TRUE,
+            lang = lang)
+        })
+      )
+    }
   }
 
   # Arrange units

@@ -831,6 +831,15 @@ SdgPredictions <- \(data, sdg.host, sdg.batch, silent = FALSE) {
     return (NULL)
   }
 
+  log <-  LogCat(
+    sprintf(
+      "Predicting SDGs for %s (this may take awhile...)",
+      Numerus(nrow(abstracts), "item")
+    ),
+    silent = silent,
+    log = log
+  )
+
   sdg.batches <- SplitData(abstracts, sdg.batch)
 
   # Start time for query
@@ -1021,7 +1030,6 @@ CreateMonthlies <- \(zotero,
                      use.multisession,
                      min.multisession,
                      n.workers,
-                     n.chunks,
                      handler,
                      restore.defaults,
                      lang,
@@ -1082,6 +1090,7 @@ CreateMonthlies <- \(zotero,
       return(tibble::tibble(x))
 
     }
+
 
     bib <- bibliography |>
       dplyr::mutate(
@@ -1218,7 +1227,6 @@ CreateMonthlies <- \(zotero,
       by.rows = FALSE,
       min.multisession = min.multisession,
       n.workers = n.workers,
-      n.chunks = n.chunks,
       limit = 100,
       use.multisession = use.multisession,
       start.message = start.message,
@@ -1254,7 +1262,6 @@ CreateMonthlies <- \(zotero,
         by.rows = TRUE,
         min.multisession = min.multisession,
         n.workers = n.workers,
-        n.chunks = n.chunks,
         limit = 100,
         use.multisession = use.multisession,
         start.message = start.message,
@@ -1331,7 +1338,6 @@ CreateMonthlies <- \(zotero,
         by.rows = TRUE,
         min.multisession = min.multisession,
         n.workers = n.workers,
-        n.chunks = n.chunks,
         limit = 100,
         use.multisession = use.multisession,
         start.message = start.message,
@@ -1388,12 +1394,6 @@ CreateSdgs <- \(items,
 
   # Update sdg if missing items
   if (any(nrow(items)) || full.update) {
-
-    log <-  LogCat(
-      "Predicting SDG (this may take awhile...)",
-      silent = silent,
-      log = log
-    )
 
     new.sdg <- SdgPredictions(items, sdg.host, sdg.batch, silent)
     # Update or insert items
@@ -1932,7 +1932,6 @@ InnUsers <- \(i = 1,
               use.multisession = TRUE,
               min.multisession = 10,
               n.workers = NULL,
-              n.chunks = NULL,
               handler = "cli",
               restore.defaults = FALSE,
               silent = FALSE,
@@ -2098,7 +2097,6 @@ InnUsers <- \(i = 1,
     by.rows = FALSE,
     min.multisession = min.multisession,
     n.workers = n.workers,
-    n.chunks = n.chunks,
     limit = 20,
     use.multisession = use.multisession,
     start.message = start.message,
