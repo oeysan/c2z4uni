@@ -142,7 +142,7 @@ CristinUnits <- \(unit.id,
           x[!is.na(x)]
         }
       ),
-      core = purrr::map(core, ~ .x[!stringr::str_detect(.x, "Affiliated")]),
+      core = purrr::map(core, ~ .x[!stringr::str_detect(.x, affiliation)]),
       name = purrr::map_chr(core, ~ tail(.x, 1))
     )
 
