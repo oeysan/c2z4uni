@@ -19,7 +19,7 @@ Faculties -&amp;gt; Departments -&amp;gt; Groups)."><!-- mathjax --><script src=
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9006</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9007</span>
       </span>
     </div>
 
@@ -79,7 +79,6 @@ Faculties -&gt; Departments -&gt; Groups).</p>
 <span>  use.multisession <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  min.multisession <span class="op">=</span> <span class="fl">25</span>,</span>
 <span>  n.workers <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  n.chunks <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  handler <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  restore.defaults <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  use.citeproc <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -192,11 +191,6 @@ Default: 25</p></dd>
 <dd><p>Optional integer for the number of workers to be used in
 multisession mode. If <code>NULL</code>, it defaults to the number of available
 cores minus one (with a minimum of one).</p></dd>
-
-
-<dt id="arg-n-chunks">n.chunks<a class="anchor" aria-label="anchor" href="#arg-n-chunks"></a></dt>
-<dd><p>Optional integer for the number of chunks to process.
-If <code>NULL</code>, it defaults to the number of workers.</p></dd>
 
 
 <dt id="arg-handler">handler<a class="anchor" aria-label="anchor" href="#arg-handler"></a></dt>
