@@ -30,7 +30,7 @@
 #' @param silent Logical, indicating whether to suppress log messages. Default
 #' is FALSE.
 #' @param log List to store log messages. Default is an empty list.
-#' @return A tibble containing metadata and HTML content for web display.
+#' @return A list containing metadata and HTML content for web display.
 #' @details Used with `CristinMonthly` to create month-to-month bibliography in
 #' markdown format
 #' @examples
@@ -64,7 +64,7 @@
 #' }
 #' @rdname CristinWeb
 #' @export
-CristinWeb <- function(monthlies,
+CristinWeb <- \(monthlies,
                        sdg.data = NULL,
                        sdg.path = NULL,
                        archive.url = NULL,
@@ -88,276 +88,132 @@ CristinWeb <- function(monthlies,
   # Visible bindings
   cristin.id <- inn.cards <- research.type <- research.design <- NULL
 
-  # Languages
-  # Set lang as nn if no
+  # Languages: if lang is "no" set to "nn"; if not Norwegian, set to "en"
   if (lang %in% c("no")) lang <- "nn"
-  # Set lang to en if not Norwegian
   if (!lang %in% c("nb", "nn", "no")) lang <- "en"
 
-  # Update user info @ inn if user.cards = TRUE
+  # Update user info (cards) if requested
   if (user.cards) {
     inn.cards <- GetCards(local.storage, full.update, lang, silent)
-  } # End user.cards
+  }
 
-  # Function to create md files
-  CreateMd <- function(item) {
+  # Inner function that creates a params list for a single publication/item.
+  CreateParams <- \(item) {
 
-    reference <- keywords.button <- synopsis.button <- synopsis <-
-      abstract.button <- abstract <- contributors.button <- contributors <-
-      unpaywall.button <- ezproxy.button <- sdg.button <- sdg <- NULL
-
-    # Function to create a vector of collection names
+    # Helper function to create a vector of collection names
     CollectionNames <- \(x) {
-      x |>
-        unlist() |>
-        strsplit(split = "\\|\\|") |>
-        unlist() |>
-        as.character() |>
-        Trim()
+      Trim(as.character(unlist(strsplit(unlist(x), split = "\\|\\|"))))
     }
 
-    # Define title
+    params <- list()
+
+    # Title: use item$title if available, otherwise use the key.
     if (any(!is.na(GoFish(item$title)))) {
-      title <- item$title
+      params$title <- item$title
     } else {
-      title <- item$key
+      params$title <- item$key
     }
 
-    # Reference
+    # Frontmatter: a simple YAML block for use in the Rmd
+    params$frontmatter <- sprintf(
+      'title: "%s"\ntype: pub', gsub("\"", "'", params$title)
+    )
+
+    # Reference: if a bibliography entry is present, add it.
     if (any(!is.na(GoFish(item$bib)))) {
-      reference <- htmltools::tags$article(
-        id = paste0("csl-bib-container-", item$key),
-        class = "csl-bib-container",
-        htmltools::HTML(item$bib)
-      )
+      params$reference <- item$bib
     }
 
-    # Keywords
+    # Keywords: combine research.type, research.design, and keywords fields.
     keywords <- item |>
       mutate(
         keywords = purrr::map_chr(
           Map(c, research.type, research.design, keywords),
-          ~ paste(.x, collapse = ", "))
+          ~ paste(.x, collapse = ", ")
+        )
       ) |>
       dplyr::pull(keywords) |>
       GoFish(type = "")
     if (keywords != "") {
-      keywords <- htmltools::tags$article(
-        htmltools::h1(Dict("keywords", lang)),
-        keywords,
-        id = paste0("keywords-article-", item$key),
-        class = "abstract-article"
-      )
-      keywords.button <- htmltools::a(
-        Dict("keywords", lang),
-        href = paste0("#", paste0("keywords-article-", item$key)),
-        class = "csl-bib-button"
-      )
+      params$keywords <- keywords
     }
 
     # Synopsis
     if (any(!is.na(GoFish(item$synopsis)))) {
-      synopsis <- htmltools::tags$article(
-        htmltools::h1(Dict("about_pub", lang)),
-        item$synopsis,
-        id = paste0("about-article-", item$key),
-        class = "abstract-article"
-      )
-      synopsis.button <- htmltools::a(
-        Dict("about_pub", lang),
-        href = paste0("#", paste0("about-article-", item$key)),
-        class = "csl-bib-button"
-      )
+      params$synopsis <- item$synopsis
     }
 
     # Abstract
     if (any(!is.na(GoFish(item$abstract)))) {
-      abstract <- htmltools::tags$article(
-        htmltools::h1(Dict("abstract", lang)),
-        item$abstract,
-        id = paste0("abstract-article-", item$key),
-        class = "abstract-article"
-      )
-      abstract.button <- htmltools::a(
-        Dict("abstract", lang),
-        href = paste0("#", paste0("abstract-article-", item$key)),
-        class = "csl-bib-button"
-      )
+      params$abstract <- item$abstract
     }
 
-    # Contributors
-    if (any(!is.na(GoFish(item$cristin.ids[[1]]))) &
-        any(nrow(inn.cards))) {
-
+    # Contributors: if there are Cristin IDs and if user cards are available.
+    if (any(!is.na(GoFish(item$cristin.ids[[1]]))) & any(nrow(inn.cards))) {
       ids <- item$cristin.ids[[1]]
       inn.card <- inn.cards |>
         dplyr::filter(cristin.id %in% ids) |>
         dplyr::arrange(match(cristin.id, ids))
 
       if (any(nrow(inn.card))) {
-        contributors <- htmltools::tags$article(
-          htmltools::h1(Dict("contributors", lang)),
-          htmltools::HTML(inn.card$card),
-          id = paste0("contributors-article-", item$key),
-          class = "contributors-article"
-        )
-        contributors.button <- htmltools::a(
-          Dict("contributors", lang),
-          href = paste0("#", paste0("contributors-article-", item$key)),
-          class = "csl-bib-button"
-        )
+        params$contributors <- inn.card$card
       }
     }
 
-    # SDG
+    # SDG: include SDG info if available.
     if (any(!is.na(GoFish(item$sdg[[1]]))) & any(length(sdg.data$sum))) {
-
-      sdg <- htmltools::tagAppendChild(
-        htmltools::tags$article(
-          htmltools::h1(Dict("sdg", lang)),
-          id = paste0("sdg-article-", item$key),
-          class = "sdg-article"
-        ),
-        htmltools::div(
-          SdgInfo(
-            sdg.data$sum,
-            as.numeric(item$sdg[[1]]),
-            lang = lang,
-            sdg.path,
-            archive.url
-          ) |>
-            do.call(what = htmltools::HTML),
-          class = "sdg-container"
-        )
-      )
-
-      sdg.button <- htmltools::a(
-        Dict("sdg", lang),
-        href = paste0("#", paste0("sdg-article-", item$key)),
-        class = "csl-bib-button"
+      params$sdg <- SdgInfo(
+        sdg.data$sum,
+        as.numeric(item$sdg[[1]]),
+        lang = lang,
+        sdg.path,
+        archive.url
       )
     }
 
-
-    # Archive
+    # Archive: combine collection names, publication year, and month.
     tags <- c(
       CollectionNames(item$collection.names),
       item$year,
       Month(item$month, lang)
     )
-    archive <- htmltools::tags$article(
-      htmltools::h1(Dict("archive", lang)),
-      htmltools::tags$ul(
-        purrr::map(tags, ~ htmltools::tags$li(.x))
-      ),
-      id = paste0("taxonomy-article-", item$key),
-      class = "taxonomy-article"
-    )
-    archive.button <- htmltools::a(
-      Dict("archive", lang),
-      href = paste0("#", paste0("taxonomy-article-", item$key)),
-      class = "csl-bib-button"
-    )
+    params$archive <- tags
 
-    # Unpaywall
+    # Unpaywall link
     if (any(!is.na(GoFish(item$unpaywall)))) {
-      unpaywall.button <- htmltools::a(
-        "Unpaywall",
-        href = item$unpaywall,
-        class = "csl-bib-button"
-      )
+      params$unpaywall <- item$unpaywall
     }
 
-    # Ezproxy
+    # EZproxy link
     if (any(!is.na(GoFish(item$ezproxy)))) {
-      ezproxy.button <- htmltools::a(
-        "EZproxy",
-        href = item$ezproxy,
-        class = "csl-bib-button"
-      )
+      params$ezproxy <- item$ezproxy
     }
 
-    # Add Cristin and Zotero buttons
-    cristin.button <- htmltools::a(
-      "Cristin",
-      href = item$cristin.url,
-      alt = "Cristin URL",
-      class = "csl-bib-button"
-    )
-    zotero.button <- htmltools::a(
-      "Zotero",
-      href = item$zotero.url,
-      alt = "Zotero URL",
-      class = "csl-bib-button"
-    )
+    # Additional links for Cristin and Zotero
+    params$cristin_url <- item$cristin.url
+    params$zotero_url <- item$zotero.url
 
-    # Combine params
-    md.frontmatter <- sprintf(
-      'title: "%s"\ntype: pub',
-      gsub("\"", "'", title)
-    )
+    # Also include key and year.month for later use.
+    params$key <- item$key
+    params$year_month <- item$year.month
 
-    md.html <- htmltools::tagList(
-      htmltools::h1(Dict("publication", lang)),
-      htmltools::tagAppendChildren(
-        # Reference
-        reference,
-        # Buttons
-        htmltools::div(
-          archive.button,
-          cristin.button,
-          zotero.button,
-          keywords.button,
-          synopsis.button,
-          contributors.button,
-          sdg.button,
-          unpaywall.button,
-          ezproxy.button,
-          class = "csl-bib-buttons"
-        ),
-        htmltools::div(
-          id = paste0("csl-bib-meta-container-", item$key)
-        )
-      ),
-      htmltools::div(
-        # Synopsis
-        synopsis,
-        # Keywords,
-        keywords,
-        # Abstract
-        abstract,
-        # Contributors
-        contributors,
-        # SDG
-        sdg,
-        # Taxonomy
-        archive,
-        id = paste0("csl-bib-meta-", item$key),
-        class = "csl-bib-meta"
-      )
-    )
-
-    md <- tibble::tibble(
+    # Return as a tibble row with a list column for params
+    out <- tibble::tibble(
       key = item$key,
-      frontmatter = md.frontmatter,
-      html = as.character(md.html),
-      year.month = item$year.month
+      params = list(params),
+      year_month = item$year.month
     )
-
-    return (md)
+    return(out)
   }
 
   start.message <- sprintf(
-    "Converting %s to HTML",
-    Numerus(
-      nrow(monthlies),
-      "item",
-    )
+    "Converting %s to Rmd params",
+    Numerus(nrow(monthlies), "item")
   )
 
   monthlies.data <- c2z::ProcessData(
     data = monthlies,
-    func = CreateMd,
+    func = CreateParams,
     by.rows = TRUE,
     min.multisession = min.multisession,
     n.workers = n.workers,
@@ -372,5 +228,4 @@ CristinWeb <- function(monthlies,
   log <- c(log, monthlies.data$log)
 
   return(list(results = results, log = log))
-
 }

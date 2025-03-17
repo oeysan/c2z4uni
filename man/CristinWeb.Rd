@@ -68,7 +68,7 @@ is FALSE.}
 \item{log}{List to store log messages. Default is an empty list.}
 }
 \value{
-A tibble containing metadata and HTML content for web display.
+A list containing metadata and HTML content for web display.
 }
 \description{
 This function generates HTML and metadata files for web

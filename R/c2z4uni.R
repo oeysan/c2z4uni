@@ -1040,8 +1040,8 @@ CreateMonthlies <- \(zotero,
 
   # Visible bindings
   new.zotero <- key <- version <- version <- name <- id <-
-    cristin.id <- year <- month <- inn.cards <- new.keys <-
-    updated.keys <- where <- key <-abstractNote <- extra <- NULL
+    cristin.id <- year <- month <- inn.cards <- new.keys <- updated.keys <-
+    where <- key <-abstractNote <- extra <- missing.items <- zotero.data <- NULL
 
   # Function to enhance bibliography
   EnhanceBib <- \(bibliography,
@@ -1054,7 +1054,7 @@ CreateMonthlies <- \(zotero,
       x <- unit.paths |>
         dplyr::filter(key %in% collections) |>
         dplyr::pull(name)
-      # Create data frame if number of collections is >= levels in collecitons
+      # Create data frame if number of collections is >= levels in collections
       if (length(x) <= max(unit.paths$level)) {
         x <- data.frame(t(x))
         # The item is a multidepartemental publication
@@ -1163,9 +1163,10 @@ CreateMonthlies <- \(zotero,
     return(return.list)
   }
 
+
   # Set all check item keys to new keys if full update or items is empty
   if (!any(nrow(items)) || full.update) {
-    new.keys <- unique(c(new.keys, check.items$key))
+    new.keys <- check.items$key
   } else {
     # Check if there are new/modified items
     new.keys <- check.items |>
@@ -1185,17 +1186,6 @@ CreateMonthlies <- \(zotero,
   if (any(nrow(monthlies))) {
     monthlies <- monthlies |>
       filter(key %in% check.items$key)
-  }
-
-  # Check if there are keys in items that are not in bibliography
-  if (any(nrow(items)) & any(nrow(bibliography))) {
-    missing.keys <- items |>
-      dplyr::anti_join(bibliography, by = c("key", "version")) |>
-      dplyr::pull(key) |>
-      GoFish(type = NULL)
-    new.keys <- unique(c(new.keys, missing.keys))
-  } else if (!any(nrow(bibliography))) {
-    new.keys <- unique(c(new.keys, items$key))
   }
 
   # Fetch bibliography for new items
@@ -1239,19 +1229,33 @@ CreateMonthlies <- \(zotero,
     # Update items
     items <- UpdateInsert(items, zotero.data$results)
 
+  }
+
+  # Check if there are keys in items that are not in bibliography
+  if (any(nrow(items)) && any(nrow(bibliography))) {
+    new.bibliographies <- items |>
+      dplyr::anti_join(bibliography, by = c("key", "version"))
+  } else if (any(nrow(items)) && !any(nrow(bibliography))) {
+    new.bibliographies <- items
+  }
+
+  if (any(nrow(new.bibliographies))) {
+
+    updated.keys <- c(unique(updated.keys, new.bibliographies$key))
+
     # Use local server for creating bibliography
     if (use.citeproc) {
 
       start.message <- sprintf(
         "Creating bibliography for %s",
         Numerus(
-          nrow(zotero.data$results),
+          nrow(new.bibliographies),
           "item",
         )
       )
 
       new.bibliography <- c2z::ProcessData(
-        data = zotero.data$results,
+        data = new.bibliographies,
         func = \(data) {
           ZoteroBib(
             item = data,
@@ -1278,7 +1282,7 @@ CreateMonthlies <- \(zotero,
       # Update bibliography
       new.bibliography <- c2z::ZoteroGet(
         zotero,
-        item.keys = zotero.data$results$key,
+        item.keys = new.bibliographies$key,
         item.type = "-attachment || note",
         library.type = "data,bib,citation",
         force = TRUE,
@@ -1292,67 +1296,67 @@ CreateMonthlies <- \(zotero,
     bibliography <- UpdateInsert(bibliography, new.bibliography) |>
       dplyr::arrange(match(key, items$key))
 
-    # Arrange bibliography according to items
-    if (any(nrow(bibliography))) {
+  }
 
-      # Check if there are keys in items that are not in monthlies
-      if (any(nrow(monthlies))) {
-        new.monthlies <- bibliography |>
-          dplyr::anti_join(monthlies, by = dplyr::join_by(key, version))
-      } else if (!any(nrow(monthlies))) {
-        new.monthlies <- bibliography
-      }
+  # Check if there are keys in items that are not in monthlies
+  if (any(nrow(bibliography)) && any(nrow(monthlies))) {
+    new.monthlies <- bibliography |>
+      dplyr::anti_join(monthlies, by = c("key", "version"))
+  } else if (any(nrow(bibliography)) && !any(nrow(monthlies))) {
+    new.monthlies <- bibliography
+  }
 
+  if (any(nrow(new.monthlies))) {
 
-      # Add collections and cristin ids from the items
-      new.monthlies <- new.monthlies |>
-        dplyr::left_join(
-          items |>
-            dplyr::select(key, version, collections, extra),
-          by = dplyr::join_by(key, version)
-        ) |>
-        dplyr::mutate(
-          cristin.id = ZoteroId("Cristin", extra)
-        )
+    updated.keys <- c(unique(updated.keys, new.monthlies$key))
 
-
-      start.message <- sprintf(
-        "Creating %s",
-        Numerus(
-          nrow(new.keys),
-          "monthly bibliography",
-          "monthly bibliographies"
-        )
+    # Add collections and cristin ids from the items
+    new.monthlies <- new.monthlies |>
+      dplyr::left_join(
+        items |>
+          dplyr::select(key, version, collections, extra),
+        by = dplyr::join_by(key, version)
+      ) |>
+      dplyr::mutate(
+        cristin.id = ZoteroId("Cristin", extra)
       )
 
-      bib.items <- c2z::ProcessData(
-        data = new.monthlies,
-        func = \(data) {
-          EnhanceBib(
-            data,
-            collections,
-            unit.paths,
-            TRUE
-          )
-        },
-        by.rows = TRUE,
-        min.multisession = min.multisession,
-        n.workers = n.workers,
-        limit = 100,
-        use.multisession = use.multisession,
-        start.message = start.message,
-        handler = handler,
-        silent = silent
+
+    start.message <- sprintf(
+      "Creating %s",
+      Numerus(
+        nrow(new.monthlies),
+        "monthly bibliography",
+        "monthly bibliographies"
       )
+    )
 
-      log <- c(log, bib.items$log)
-      new.bibliography <- bib.items$results
+    new.monthlies <- c2z::ProcessData(
+      data = new.monthlies,
+      func = \(data) {
+        EnhanceBib(
+          data,
+          collections,
+          unit.paths,
+          TRUE
+        )
+      },
+      by.rows = TRUE,
+      min.multisession = min.multisession,
+      n.workers = n.workers,
+      limit = 100,
+      use.multisession = use.multisession,
+      start.message = start.message,
+      handler = handler,
+      silent = silent
+    )
 
-      # Update or insert items
-      monthlies <- UpdateInsert(monthlies, bib.items$results) |>
-        dplyr::arrange(match(key, items$key))
+    log <- c(log, new.monthlies$log)
 
-    }
+    # Update or insert items
+    monthlies <- UpdateInsert(monthlies, new.monthlies$results) |>
+      dplyr::arrange(match(key, items$key))
+
   }
 
   # Create return.list
