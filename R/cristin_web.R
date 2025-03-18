@@ -190,18 +190,21 @@ CristinWeb <- \(monthlies,
     }
 
     # Additional links for Cristin and Zotero
-    params$cristin_url <- item$cristin.url
-    params$zotero_url <- item$zotero.url
+    params$cristin.url <- item$cristin.url
+    params$zotero.url <- item$zotero.url
 
-    # Also include key and year.month for later use.
+    # Also include key and year.month and lang for later use.
     params$key <- item$key
-    params$year_month <- item$year.month
+    params$year.month <- item$year.month
+    params$lang <- lang
 
     # Return as a tibble row with a list column for params
     out <- tibble::tibble(
       key = item$key,
+      version = item$version,
       params = list(params),
-      year_month = item$year.month
+      year.month = item$year.month,
+      lang = lang
     )
     return(out)
   }
