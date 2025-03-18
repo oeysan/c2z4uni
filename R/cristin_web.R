@@ -172,12 +172,15 @@ CristinWeb <- \(monthlies,
     }
 
     # Archive: combine collection names, publication year, and month.
-    tags <- c(
+    archive.names <- c(
       CollectionNames(item$collection.names),
       item$year,
       Month(item$month, lang)
     )
-    params$archive <- tags
+
+    params$archive.url <- archive.url
+    params$archive.keys <- unlist(item$collections)
+    params$archive.names <- archive.names
 
     # Unpaywall link
     if (any(!is.na(GoFish(item$unpaywall)))) {
