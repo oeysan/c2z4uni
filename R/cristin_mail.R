@@ -171,8 +171,6 @@ CristinMail <- \(unit.id,
     return (NULL)
   }
 
-  print(bib)
-
   # replace style from bibliography
   ## CSS is poorly supported in many email clients
   if (replace.style) {
