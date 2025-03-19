@@ -100,11 +100,6 @@ CristinWeb <- \(monthlies,
   # Inner function that creates a params list for a single publication/item.
   CreateParams <- \(item) {
 
-    # Helper function to create a vector of collection names
-    CollectionNames <- \(x) {
-      Trim(as.character(unlist(strsplit(unlist(x), split = "\\|\\|"))))
-    }
-
     params <- list()
 
     # Title: use item$title if available, otherwise use the key.
@@ -171,16 +166,8 @@ CristinWeb <- \(monthlies,
       )
     }
 
-    # Archive: combine collection names, publication year, and month.
-    archive.names <- c(
-      CollectionNames(item$collection.names),
-      item$year,
-      Month(item$month, lang)
-    )
-
-    params$archive.url <- archive.url
-    params$archive.keys <- unlist(item$collections)
-    params$archive.names <- archive.names
+    # Archive
+    params$archive <- item$collection.paths
 
     # Unpaywall link
     if (any(!is.na(GoFish(item$unpaywall)))) {
@@ -202,14 +189,16 @@ CristinWeb <- \(monthlies,
     params$lang <- lang
 
     # Return as a tibble row with a list column for params
-    out <- tibble::tibble(
+    output <- tibble::tibble(
       key = item$key,
       version = item$version,
       params = list(params),
+      year = item$year,
+      month = item$month,
       year.month = item$year.month,
       lang = lang
     )
-    return(out)
+    return(output)
   }
 
   start.message <- sprintf(

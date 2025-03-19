@@ -1049,54 +1049,35 @@ CreateMonthlies <- \(zotero,
                   unit.paths,
                   silent) {
 
-    CollectionNames <- \(unit.paths, collections, cristin.id) {
-      # Filter out collections found in unit.paths
-      x <- unit.paths |>
-        dplyr::filter(key %in% collections) |>
-        dplyr::pull(name)
-      # Create data frame if number of collections is >= levels in collections
-      if (length(x) <= max(unit.paths$level)) {
-        x <- data.frame(t(x))
-        # The item is a multidepartemental publication
-      } else {
-        cristin.ids <- CristinId(cristin.id, unit = TRUE)
-        x <- unit.paths |>
-          # Find unit names of
-          dplyr::filter(id %in% cristin.ids) |>
-          dplyr::arrange(match(id, cristin.ids)) |>
-          dplyr::pull(key) |>
-          # Find unit paths of each contributor (e.g., Uni -> Faculty -> Dep)
-          purrr::map(
-            ~ data.frame(t(AncestorPath(unit.paths, .x, TRUE)))
-          ) |>
-          dplyr::bind_rows() |>
-          # Replace duplicates with NA
-          dplyr::mutate(
-            dplyr::across(
-              dplyr::everything(), ~ replace(.x, duplicated(.x), NA)
-            )
-          ) |>
-          # Create a single row with combined units
-          dplyr::summarise(
-            dplyr::across(
-              dplyr::everything(), ~ paste(.x[!is.na(.x)], collapse = " || ")
-            )
-          )
-      }
-      # Create column names
-      names(x) <- paste0("collection.name", AddPad(seq_len(ncol(x))))
+    CollectionPaths <- \(collections, item.collections) {
 
-      # Set a tibble and return
-      return(tibble::tibble(x))
+      tail.collections <- collections |>
+        dplyr::filter(key %in% unlist(item.collections)) |>
+        dplyr::filter(stringr::str_detect(name, "^[0-9]{2}:\\s+[A-Za-z]+$")) |>
+        dplyr::pull(key)
 
+      collection.keys <- lapply(tail.collections, \(x) {
+        AncestorPath(collections, x)
+      })
+
+      collection.names <- lapply(collection.keys, \(x) {
+        collections |>
+          dplyr::filter(key %in% unlist(x)) |>
+          dplyr::pull(name)
+      })
+
+      return.list <- list(
+        collection.keys = collection.keys,
+        collection.names = collection.names
+      )
+
+      return(return.list)
     }
-
 
     bib <- bibliography |>
       dplyr::mutate(
-        collection.names = purrr::pmap(
-          list(collections, cristin.id), ~ CollectionNames(unit.paths, .x, .y),
-          .progress = if (!silent) "Finding collections" else FALSE
+        collection.paths = purrr::map(
+          collections, ~ CollectionPaths(.env$collections, .x)
         ),
         year = purrr::map_int(collections, ~ {
           .env$collections |>
@@ -1121,8 +1102,7 @@ CreateMonthlies <- \(zotero,
         year.month = paste0(year, "_" , AddPad(month, 2))
       )
 
-    return (bib)
-
+    return(bib)
   }
 
   # Log
@@ -1243,16 +1223,16 @@ CreateMonthlies <- \(zotero,
 
     updated.keys <- c(unique(updated.keys, new.bibliographies$key))
 
+    start.message <- sprintf(
+      "Creating bibliography for %s",
+      Numerus(
+        nrow(new.bibliographies),
+        "item",
+      )
+    )
+
     # Use local server for creating bibliography
     if (use.citeproc) {
-
-      start.message <- sprintf(
-        "Creating bibliography for %s",
-        Numerus(
-          nrow(new.bibliographies),
-          "item",
-        )
-      )
 
       new.bibliography <- c2z::ProcessData(
         data = new.bibliographies,
@@ -1265,6 +1245,7 @@ CreateMonthlies <- \(zotero,
         },
         by.rows = TRUE,
         min.multisession = min.multisession,
+        n.message = 10,
         n.workers = n.workers,
         limit = 100,
         use.multisession = use.multisession,
@@ -1285,6 +1266,7 @@ CreateMonthlies <- \(zotero,
         item.keys = new.bibliographies$key,
         item.type = "-attachment || note",
         library.type = "data,bib,citation",
+        limit = 25,
         force = TRUE,
         use.collection = FALSE
       )
@@ -1343,6 +1325,7 @@ CreateMonthlies <- \(zotero,
       },
       by.rows = TRUE,
       min.multisession = min.multisession,
+      n.message = 10,
       n.workers = n.workers,
       limit = 100,
       use.multisession = use.multisession,

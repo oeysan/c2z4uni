@@ -71,7 +71,8 @@ CristinMail <- \(unit.id,
 
   # Visible bindings
   body <- month.key <- year.month <- year <- id <- collections <-
-    collection.names <- bib.item <- bib.body <- key <- NULL
+    collection.names <- collection.paths <- collection.keys <-
+    bib.item <- bib.body <- key <- NULL
 
   # Languages
   # Set lang as nn if no
@@ -80,7 +81,7 @@ CristinMail <- \(unit.id,
   if (!lang %in% c("nb", "nn", "no")) lang <- "en"
 
   # Function to add archive URL to publication
-  AddAchive <- \(bib.item, key, lang) {
+  AddArchive <- \(bib.item, key, lang) {
 
     bib.archive <- sprintf(
       " | <a href=\"%1$s/%2$s/pub/%3$s\">%4$s</a>",
@@ -99,39 +100,58 @@ CristinMail <- \(unit.id,
     return (bib.item)
   }
 
-  # Keep only latest entry
+  current.unit <- dplyr::filter(unit.paths, id == unit.id)$key
+  affiliation <- Dict("affiliation", lang)
+
   bib <- monthlies |>
-    dplyr::filter(
-      grepl(
-        dplyr::filter(unit.paths, id == unit.id)$key,
-        collections)
-    ) |>
     dplyr::group_split(year.month) |>
     rev() |>
     purrr::pluck(1) |>
-    tidyr::unnest(collection.names) |>
+    # Filter publications based on the collections string, if needed
+    dplyr::filter(grepl(current.unit, collections)) |>
+    dplyr::mutate(
+      units = purrr::map(
+        collection.paths,
+        ~ tibble(
+          collection.keys  = .x$collection.keys,
+          collection.names = .x$collection.names
+        )
+      )
+    ) |>
+    tidyr::unnest(units) |>
+    dplyr::filter(purrr::map_lgl(collection.keys, ~ current.unit %in% .x)) |>
+    tidyr::unnest_wider(collection.names, names_sep = "") |>
     dplyr::arrange(
       dplyr::across(
-        dplyr::starts_with("collection.name"),
-        ~ data.frame(!is.na(.x), .x)
+        dplyr::starts_with("collection.names"),
+        ~ data.frame(!is.na(.x), !.x %in% affiliation, .x)
       )
     ) |>
     dplyr::mutate(
       bib.item = purrr::pmap_chr(
-        list(bib.item, key, lang), ~ AddAchive(...)
+        list(bib.item, key, lang),
+        ~ AddArchive(...)
       ),
       bib = purrr::pmap_chr(
-        list(bib.body, bib.item), ~ sprintf(.x, .y)
+        list(bib.body, bib.item),
+        ~ sprintf(.x, .y)
       ),
       dplyr::across(
-        c(year, dplyr::starts_with("collection.name")), ~
-          replace(.x, duplicated(.x), NA)
+        c(dplyr::starts_with("collection.names")),
+        ~ replace(
+          .x,
+          duplicated(.x) |
+            grepl("^[0-9]{4}$", as.character(.x)) |
+            grepl("^[0-9]{2}:\\s", as.character(.x)),
+          NA
+        )
       ),
       # Create headers for each row
       headers = purrr::pmap_chr(
-        dplyr::across(dplyr::starts_with("collection.name")), ~ {
+        dplyr::across(dplyr::starts_with("collection.names")),
+        ~ {
           x <- c(...)
-          lapply(seq_along(x), \(i) {
+          lapply(seq_along(x), function(i) {
             if (!is.na(x[[i]])) {
               if (i == 1) {
                 sprintf("<h1 style=\"text-align:center;\">%s</h1>", x[[i]])
@@ -150,6 +170,8 @@ CristinMail <- \(unit.id,
   if (!any(nrow(bib))) {
     return (NULL)
   }
+
+  print(bib)
 
   # replace style from bibliography
   ## CSS is poorly supported in many email clients
