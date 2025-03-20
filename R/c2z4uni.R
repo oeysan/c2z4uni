@@ -1049,7 +1049,7 @@ CreateMonthlies <- \(zotero,
                   unit.paths,
                   silent) {
 
-    CollectionPaths <- \(collections, item.collections) {
+    CollectionPaths <- \(unit.paths, collections, item.collections, lang) {
 
       tail.collections <- collections |>
         dplyr::filter(key %in% unlist(item.collections)) |>
@@ -1060,10 +1060,25 @@ CreateMonthlies <- \(zotero,
         AncestorPath(collections, x)
       })
 
-      collection.names <- lapply(collection.keys, \(x) {
-        collections |>
-          dplyr::filter(key %in% unlist(x)) |>
-          dplyr::pull(name)
+      collection.names <- lapply(collection.keys, \(keys) {
+        units <- collections |> dplyr::filter(key %in% unlist(keys))
+        names <- sapply(seq_len(nrow(units)), \(i) {
+          unit.key <- units$key[i]
+          name <- if (any(grepl(unit.key, unit.paths$affiliated))) {
+            Dict("affiliation", lang)
+          } else {
+            dplyr::filter(unit.paths, key == unit.key)$name |> GoFish()
+          }
+
+          if (is.na(name)) name <- units$name[i]
+          if (grepl("^\\d{2}:", name)) {
+            name <- as.numeric(sub("^([0-9]{2}):.*$", "\\1", name)) |>
+              Month(lang = lang)
+          }
+
+          return (name)
+        })
+        return (names)
       })
 
       return.list <- list(
@@ -1077,7 +1092,7 @@ CreateMonthlies <- \(zotero,
     bib <- bibliography |>
       dplyr::mutate(
         collection.paths = purrr::map(
-          collections, ~ CollectionPaths(.env$collections, .x)
+          collections, ~ CollectionPaths(unit.paths, .env$collections, .x, lang)
         ),
         year = purrr::map_int(collections, ~ {
           .env$collections |>
