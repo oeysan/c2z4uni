@@ -972,11 +972,8 @@ SdgInfo <- \(sdg.sum,
   # Urls
   sdg.urls <- SdgUrls(lang, sdgs)
 
-  i <- 1
-
   # Initialize an empty list to store the HTML code for each SDG
-  sdg.html <- lapply(seq_along(sdgs), \(i) {
-    x <- sdgs[[i]]
+  sdg.html <- lapply(sdgs, \(x) {
     sdg.id <- sprintf("sdg%d", x)
     if (is.null(sdg.path)) sdg.path <- "/images/sdg"
     sdg.archive.url <- paste0(
@@ -984,31 +981,33 @@ SdgInfo <- \(sdg.sum,
       paste0("?sdg=", x, archive.append, "#archive")
     )
     sdg.image <- file.path(sdg.path, sprintf("sdg%02d_%s.png", x, lang))
-    sdg.publications <- Dict("publication", lang, sdg.sum[[i]])
-    sdg.span <- sprintf("%s", sdg.sum[[i]])
-    sdg.url <- sprintf("%s", sdg.urls[[i]])
+    sdg.publications <- Dict("publication", lang, sdg.sum[[x]])
+    sdg.span <- sprintf("%s", sdg.sum[[x]])
+    sdg.url <- sprintf("%s", sdg.urls[[x]])
 
     # Create the HTML code for the current SDG
-    sdg.code <- sprintf(
-      '<div id="%s" class="sdg">
-        <img src="%s" class="image" alt="SDG %d">
-        <div class="sdg-overlay">
-          <a href="%s" class="sdg-publication-count"><span>%s</span> %s</a>
-          <p><a href="%s" class="sdg-read-more">%s</a></p>
-        </div>
-      </div>',
-      sdg.id,
-      sdg.image,
-      x,
-      sdg.archive.url,
-      sdg.span,
-      sdg.publications,
-      sdg.url,
-      Dict("readmore", lang)
-    )
-
-    # Append the HTML code to the list
-    Trim(sdg.code)
+    sdg.code <- htmltools::tags$div(
+      id = sdg.id,
+      class = "sdg",
+      htmltools::tags$img(src = sdg.image, class = "image", alt = paste("SDG", x)),
+      htmltools::tags$div(
+        class = "sdg-overlay",
+        htmltools::tags$a(
+          href = sdg.archive.url,
+          class = "sdg-publication-count",
+          htmltools::tags$span(sdg.span),
+          sdg.publications
+        ),
+        htmltools::tags$p(
+          htmltools::tags$a(
+            href = sdg.url,
+            class = "sdg-read-more",
+            Dict("readmore", lang)
+          )
+        )
+      )
+    ) |>
+      as.character()
 
   })
 
@@ -3188,6 +3187,18 @@ ApaTitle <- function(title) {
   return(paste(words, collapse = " "))
 }
 
+#' @title CleanAbstract
+#' @keywords internal
+#' @noRd
+CleanAbstract <- \(text) {
+  sub(
+    "^(?i)(abstract|background|objectives?|introduction)(?=(?-i:[A-Z]))(\\S+)(.*)$",
+    "\\2\\3",
+    text,
+    perl = TRUE
+  )
+}
+
 #' @title CleanText
 #' @keywords internal
 #' @noRd
@@ -3221,7 +3232,7 @@ CleanText <- function(x, multiline = FALSE) {
   x <- gsub("<.*?>|&lt;|&gt;|\ufffd", "", x)
 
   # Remove the word "abstract" from the beginning (case-insensitive)
-  x <- sub("(?i)^abstract\\b\\s*", "", x, perl = TRUE)
+  x <- CleanAbstract(x)
 
   # Collapse multiple whitespace characters into a single space.
   x <- Trim(gsub("\\s+", " ", x))
