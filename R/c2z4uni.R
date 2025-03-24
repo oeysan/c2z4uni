@@ -994,30 +994,29 @@ SdgInfo <- \(sdg.sum,
     sdg.url <- sprintf("%s", sdg.urls[[i]])
 
     # Create the HTML code for the current SDG
-    sdg.code <- htmltools::tags$div(
-      id = sdg.id,
-      class = "sdg",
-      htmltools::tags$img(src = sdg.image, class = "image", alt = paste("SDG", x)),
-      htmltools::tags$div(
-        class = "sdg-overlay",
-        htmltools::tags$a(
-          href = sdg.archive.url,
-          class = "sdg-publication-count",
-          htmltools::tags$span(sdg.span),
-          sdg.publications
-        ),
-        htmltools::tags$p(
-          htmltools::tags$a(
-            href = sdg.url,
-            class = "sdg-read-more",
-            Dict("readmore", lang)
-          )
-        )
-      )
-    ) |>
-      as.character()
+    sdg.code <- sprintf(
+      '<div id="%s" class="sdg">
+        <img src="%s" class="image" alt="SDG %d">
+        <div class="sdg-overlay">
+          <a href="%s" class="sdg-publication-count"><span>%s</span> %s</a>
+          <p><a href="%s" class="sdg-read-more">%s</a></p>
+        </div>
+      </div>',
+      sdg.id,
+      sdg.image,
+      x,
+      sdg.archive.url,
+      sdg.span,
+      sdg.publications,
+      sdg.url,
+      Dict("readmore", lang)
+    )
+
+    # Append the HTML code to the list
+    return (sdg.code)
 
   })
+
 
   return(sdg.html[lengths(sdg.html) > 0])
 

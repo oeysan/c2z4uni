@@ -122,14 +122,15 @@ CristinWeb <- \(monthlies,
       return (button)
     }
 
-    CreateArticle <- \(name, data, key, lang) {
+    CreateArticle <- \(name, data, key, lang, id = NULL) {
       if (any(is.na(GoFish(data)))) return (NULL)
       dict.name <- Dict(name, lang)
       if (is.null(dict.name)) dict.name <- name
+      if (is.null(id)) id <- name
       article <- htmltools::tags$article(
         htmltools::h1(dict.name),
         htmltools::HTML(data),
-        id = paste0(name, "-article-", key),
+        id = paste0(id, "-article-", key),
         class = paste0(name, "-article")
       )
     }
@@ -207,7 +208,7 @@ CristinWeb <- \(monthlies,
         paste0("#", paste0("about-article-", key)),
         lang
       )
-      synopsis <- CreateArticle("about_pub", item$synopsis, key, lang)
+      synopsis <- CreateArticle("about_pub", item$synopsis, key, lang, "about")
     }
 
     if (any(!is.na(GoFish(item$keywords)))) {
