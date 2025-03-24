@@ -920,7 +920,6 @@ SdgInfo <- \(sdg.sum,
   sdg.lang <- if(lang == "nn") "nno-NO" else "nnb-NO"
 
   SdgUrls <- \(lang = "nn", sdgs) {
-
     # Find Norwegian urls
     if (lang == "nn" || lang == "nb") {
 
@@ -944,7 +943,7 @@ SdgInfo <- \(sdg.sum,
         "https://fn.no/om-fn/fns-baerekraftsmaal/samarbeid-for-aa-naa-maalene"
       )
 
-      sdg.urls <- paste0(urls, "?lang=", sdg.lang)
+      sdg.urls <- paste0(urls, "?lang=", sdg.lang)[sdgs]
 
     } else {
 
@@ -956,24 +955,31 @@ SdgInfo <- \(sdg.sum,
 
   }
 
-  # List of SDGs
+  # Set SDG range
   sdgs <- if (is.null(range)) 1:17 else range
-  # Delete zero if delete is true
+  sdg.sum <- sdg.sum[sdgs]  # Match sdg.sum to selected sdgs
+
+  # Delete SDGs with zero or NA sum, if delete is TRUE
   if (delete) {
-    sdgs <- sdgs[sdg.sum > 0]
-    sdg.sum <- sdg.sum[sdg.sum > 0]
+    valid <- !is.na(sdg.sum) & sdg.sum > 0
+    sdgs <- sdgs[valid]
+    sdg.sum <- sdg.sum[valid]
   }
-  # Sort if sort is true
+
+
+  # Sort SDGs by sdg.sum, if sort is TRUE
   if (sort) {
-    sdgs <- sdgs[order(sdg.sum, decreasing = TRUE)]
-    sdg.sum <- sdg.sum[order(sdg.sum, decreasing = TRUE)]
+    ord <- order(sdg.sum, decreasing = TRUE)
+    sdgs <- sdgs[ord]
+    sdg.sum <- sdg.sum[ord]
   }
 
   # Urls
   sdg.urls <- SdgUrls(lang, sdgs)
 
   # Initialize an empty list to store the HTML code for each SDG
-  sdg.html <- lapply(sdgs, \(x) {
+  sdg.html <- lapply(seq_along(sdgs), \(i) {
+    x <- sdgs[[i]]
     sdg.id <- sprintf("sdg%d", x)
     if (is.null(sdg.path)) sdg.path <- "/images/sdg"
     sdg.archive.url <- paste0(
@@ -981,9 +987,9 @@ SdgInfo <- \(sdg.sum,
       paste0("?sdg=", x, archive.append, "#archive")
     )
     sdg.image <- file.path(sdg.path, sprintf("sdg%02d_%s.png", x, lang))
-    sdg.publications <- Dict("publication", lang, sdg.sum[[x]])
-    sdg.span <- sprintf("%s", sdg.sum[[x]])
-    sdg.url <- sprintf("%s", sdg.urls[[x]])
+    sdg.publications <- Dict("publication", lang, sdg.sum[[i]])
+    sdg.span <- sprintf("%s", sdg.sum[[i]])
+    sdg.url <- sprintf("%s", sdg.urls[[i]])
 
     # Create the HTML code for the current SDG
     sdg.code <- htmltools::tags$div(
