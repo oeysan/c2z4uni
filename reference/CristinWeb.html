@@ -20,7 +20,7 @@ with frontmatter for further processing."><!-- mathjax --><script src="https://c
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">c2z4uni</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9016</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9017</span>
       </span>
     </div>
 
@@ -192,19 +192,20 @@ to programmatically build HTML elements such as articles and buttons for links t
 <span class="r-in"><span>    use.citeproc <span class="op">=</span> <span class="cn">FALSE</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span></span></span>
 <span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in if (count == 1) singularis else pluralis:</span> argument is of length zero</span>
-<span class="r-in"><span></span></span>
 <span class="r-in"><span>  <span class="co"># Generate HTML and markdown files</span></span></span>
-<span class="r-in"><span>  <span class="va">example.web</span> <span class="op">&lt;-</span> <span class="fu">CristinWeb</span><span class="op">(</span></span></span>
-<span class="r-in"><span>    <span class="va">example</span><span class="op">$</span><span class="va">monthlies</span>,</span></span>
-<span class="r-in"><span>    user.cards <span class="op">=</span> <span class="cn">FALSE</span></span></span>
-<span class="r-in"><span>  <span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in example$monthlies:</span> object of type 'closure' is not subsettable</span>
+<span class="r-in"><span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/any.html" class="external-link">any</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">example</span><span class="op">$</span><span class="va">monthlies</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span>    <span class="co"># Generate HTML and markdown files</span></span></span>
+<span class="r-in"><span>    <span class="va">example.web</span> <span class="op">&lt;-</span> <span class="fu">CristinWeb</span><span class="op">(</span></span></span>
+<span class="r-in"><span>      <span class="va">example</span><span class="op">$</span><span class="va">monthlies</span>,</span></span>
+<span class="r-in"><span>      user.cards <span class="op">=</span> <span class="cn">FALSE</span></span></span>
+<span class="r-in"><span>    <span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span>  <span class="co"># Print the three first publication titles (if any)</span></span></span>
-<span class="r-in"><span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">example</span><span class="op">$</span><span class="va">monthlies</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span>    <span class="va">example</span><span class="op">$</span><span class="va">monthlies</span> <span class="op">|&gt;</span></span></span>
-<span class="r-in"><span>      <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">title</span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
-<span class="r-in"><span>      <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">3</span>, width <span class="op">=</span> <span class="fl">80</span><span class="op">)</span></span></span>
+<span class="r-in"><span>    <span class="co"># Print the three first publication titles (if any)</span></span></span>
+<span class="r-in"><span>    <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">example</span><span class="op">$</span><span class="va">monthlies</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span>      <span class="va">example</span><span class="op">$</span><span class="va">monthlies</span> <span class="op">|&gt;</span></span></span>
+<span class="r-in"><span>        <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">title</span><span class="op">)</span> <span class="op">|&gt;</span></span></span>
+<span class="r-in"><span>        <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">3</span>, width <span class="op">=</span> <span class="fl">80</span><span class="op">)</span></span></span>
+<span class="r-in"><span>    <span class="op">}</span></span></span>
 <span class="r-in"><span>  <span class="op">}</span></span></span>
 <span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in example$monthlies:</span> object of type 'closure' is not subsettable</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
