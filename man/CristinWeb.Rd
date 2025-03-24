@@ -96,18 +96,20 @@ to programmatically build HTML elements such as articles and buttons for links t
     silent = TRUE,
     use.citeproc = FALSE
   )
-
   # Generate HTML and markdown files
-  example.web <- CristinWeb(
-    example$monthlies,
-    user.cards = FALSE
-  )
+  if (any(nrow(example$monthlies))) {
+    # Generate HTML and markdown files
+    example.web <- CristinWeb(
+      example$monthlies,
+      user.cards = FALSE
+    )
 
-  # Print the three first publication titles (if any)
-  if (!is.null(example$monthlies)) {
-    example$monthlies |>
-      dplyr::select(title) |>
-      print(n = 3, width = 80)
+    # Print the three first publication titles (if any)
+    if (!is.null(example$monthlies)) {
+      example$monthlies |>
+        dplyr::select(title) |>
+        print(n = 3, width = 80)
+    }
   }
 }
 }

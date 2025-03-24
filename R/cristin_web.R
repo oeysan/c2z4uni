@@ -47,18 +47,20 @@
 #'     silent = TRUE,
 #'     use.citeproc = FALSE
 #'   )
-#'
 #'   # Generate HTML and markdown files
-#'   example.web <- CristinWeb(
-#'     example$monthlies,
-#'     user.cards = FALSE
-#'   )
+#'   if (any(nrow(example$monthlies))) {
+#'     # Generate HTML and markdown files
+#'     example.web <- CristinWeb(
+#'       example$monthlies,
+#'       user.cards = FALSE
+#'     )
 #'
-#'   # Print the three first publication titles (if any)
-#'   if (!is.null(example$monthlies)) {
-#'     example$monthlies |>
-#'       dplyr::select(title) |>
-#'       print(n = 3, width = 80)
+#'     # Print the three first publication titles (if any)
+#'     if (!is.null(example$monthlies)) {
+#'       example$monthlies |>
+#'         dplyr::select(title) |>
+#'         print(n = 3, width = 80)
+#'     }
 #'   }
 #' }
 #' @rdname CristinWeb
@@ -172,6 +174,13 @@ CristinWeb <- \(monthlies,
       )
 
       return(archive.list)
+    }
+
+    # Title: use item$title if available, otherwise use the key.
+    if (any(!is.na(GoFish(item$title)))) {
+      title <- item$title
+    } else {
+      title <- item$key
     }
 
     key <- item$key
@@ -320,7 +329,12 @@ CristinWeb <- \(monthlies,
         )
       )
 
-      frontmatter <- sprintf('title: "%s"\ntype: pub\nencoding: UTF-8', item$title)
+      frontmatter.list <- list(
+        title = title,
+        type = "pub",
+        encoding = "UTF-8"
+      )
+      frontmatter <- yaml::as.yaml(frontmatter.list)
       path <- file.path(md.path, paste0(key, ".md"))
       if (md.save) {
         writeLines(

@@ -35,6 +35,8 @@
 #'   future_lapply
 #' @importFrom progressr
 #'   progressor
+#' @importFrom yaml
+#'   as.yaml
 NULL
 #> NULL
 
