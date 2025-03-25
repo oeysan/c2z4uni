@@ -89,10 +89,13 @@ DictLoad <- function(lang = "nn", pkgname) {
 Dict <- function(x = NULL,
                  lang = "nn",
                  count = 1,
-                 to.lower = FALSE,
                  prefix = FALSE,
                  error = NULL,
-                 i18n = NULL) {
+                 i18n = NULL,
+                 title.case = FALSE,
+                 apa.case = FALSE,
+                 capital.case = FALSE,
+                 lower.case = FALSE) {
 
   # Retrieve the dictionary from the mutable environment if not provided
   if (is.null(i18n)) {
@@ -125,14 +128,21 @@ Dict <- function(x = NULL,
     }
   }
 
-  # Convert the string to lower case if requested
-  if (to.lower & !is.null(string)) {
-    string <- tolower(string)
+  # Convert the string to specified case if requested
+  if (!is.null(string)) {
+    if (apa.case) {
+      string <- ApaTitle(string)
+    } else if (capital.case) {
+      string <- toupper(string)
+    } else if (title.case) {
+      string <- paste0(toupper(substring(string, 1, 1)), substring(string, 2))
+    } else if (lower.case) {
+      string <- tolower(string)
+    }
   }
 
   return(string)
 }
-
 
 #' @title ZoteroBib
 #' @keywords internal
@@ -3141,7 +3151,7 @@ SaveData <- \(data,
 
 }
 
-#' @title CleanText
+#' @title CapitalLetters
 #' @keywords internal
 #' @noRd
 CapitalLetters <- \(s) {
@@ -3176,14 +3186,20 @@ ApaTitle <- function(title) {
     # Determine if the word should be capitalized:
     # Always capitalize if it's the first or last word,
     # or if the previous word ended with a colon.
-    if (i == 1 || i == n || (i > 1 && substr(words[i - 1], nchar(words[i - 1]), nchar(words[i - 1])) == ":")) {
-      words[i] <- paste0(toupper(substr(words[i], 1, 1)), substr(words[i], 2, nchar(words[i])))
+    if (i == 1 || i == n || (i > 1 && substr(
+        words[i - 1], nchar(words[i - 1]), nchar(words[i - 1])
+      ) == ":")) {
+      words[i] <- paste0(
+        toupper(substr(words[i], 1, 1)), substr(words[i], 2, nchar(words[i]))
+      )
     } else if (words[i] %in% minor.words) {
       # Leave the word in lowercase if it is a minor word
       # (already lowercased by the call to tolower())
       words[i] <- words[i]
     } else {
-      words[i] <- paste0(toupper(substr(words[i], 1, 1)), substr(words[i], 2, nchar(words[i])))
+      words[i] <- paste0(
+        toupper(substr(words[i], 1, 1)), substr(words[i], 2, nchar(words[i]))
+      )
     }
 
     # Re-attach any trailing punctuation
@@ -3197,13 +3213,22 @@ ApaTitle <- function(title) {
 #' @title CleanAbstract
 #' @keywords internal
 #' @noRd
-CleanAbstract <- \(text) {
-  sub(
-    "^(?i)(abstract|background|objectives?|introduction)(?=(?-i:[A-Z]))(\\S+)(.*)$",
-    "\\2\\3",
-    text,
-    perl = TRUE
+#' @noRd
+CleanAbstract <- function(text) {
+  keywords <- c(
+    "abstract",
+    "background",
+    "objectives?",
+    "introduction",
+    "summary"
   )
+  # Combine keywords into a single pattern string with "|" as separator
+  keyword.pattern <- paste(keywords, collapse = "|")
+
+  # Use sprintf to insert the keyword pattern into the full regex
+  pattern <- sprintf("^(?i)(%s)(?=(?-i:[A-Z]))(\\S+)(.*)$", keyword.pattern)
+
+  sub(pattern, "\\2\\3", text, perl = TRUE)
 }
 
 #' @title CleanText

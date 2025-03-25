@@ -287,7 +287,7 @@ CristinWeb <- \(monthlies,
 
     if (any(!is.na(GoFish(item$bib)))) {
       md.data <- htmltools::tagList(
-        htmltools::h1(Dict("publication", lang)),
+        htmltools::h1(Dict("publication", lang, title.case = TRUE)),
         htmltools::tagAppendChildren(
           # Reference
           htmltools::tags$article(
