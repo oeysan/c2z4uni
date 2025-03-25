@@ -148,7 +148,13 @@ CristinWeb <- \(monthlies,
       ListItems <- \(keys, names, base.url) {
         htmltools::tags$ul(mapply(
           \(key, name) htmltools::tags$li(
-            htmltools::a(href = paste0(base.url, key), name)
+            htmltools::HTML(
+              sprintf(
+                '<a href="%s">%s</a>',
+                paste0(base.url, "?key=", key),
+                name
+              )
+            )
           ),
           keys,
           names,
@@ -195,7 +201,7 @@ CristinWeb <- \(monthlies,
     if (any(!is.na(GoFish(item$collection.paths)))) {
       archive <- CreateArchive(
         item$collection.paths[[1]],
-        paste(archive.url, "?key="),
+        archive.url,
         key,
         lang
       )
