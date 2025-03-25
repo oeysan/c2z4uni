@@ -193,8 +193,12 @@ CristinWeb <- \(monthlies,
 
     # Define Archive
     if (any(!is.na(GoFish(item$collection.paths)))) {
-      archive.url <- paste0("/", lang, "/archive/?key=")
-      archive <- CreateArchive(item$collection.paths[[1]], archive.url, key, lang)
+      archive <- CreateArchive(
+        item$collection.paths[[1]],
+        paste(archive.url, "?key="),
+        key,
+        lang
+      )
       archive.button <- CreateButton(
         "archive",
         paste0("#", paste0("taxonomy-article-", key)),
