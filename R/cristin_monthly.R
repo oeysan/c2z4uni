@@ -46,6 +46,7 @@
 #' Default: FALSE'
 #' @param use.citeproc, Use local citeproc and translator to create bibliography,
 #' Default: FALSE
+#' @param citeproc.host host for creating citeproc bibliography, Default: NULL
 #' @param lang Define bibliography language (nn, nb, en), Default: 'nn'
 #' @param post.lang Define language for Zotero collections (nn, nb, en),
 #' Default: 'nn'
@@ -119,6 +120,7 @@ CristinMonthly <- \(zotero,
                     handler = NULL,
                     restore.defaults = TRUE,
                     use.citeproc = FALSE,
+                    citeproc.host = NULL,
                     full.update = FALSE,
                     lang = "nn",
                     post.lang = "nn",
@@ -448,7 +450,8 @@ CristinMonthly <- \(zotero,
       # the condition is TRUE.
       cristin$results$collections <- between.results |>
         dplyr::select(-name) |>
-        purrr::imap(~ unname(unlist(period.data[.x, "path"])))
+        purrr::imap(~ unname(unlist(period.data[.x, "path"]))) |>
+        unname()
 
       return(cristin$results)
 
@@ -684,6 +687,7 @@ CristinMonthly <- \(zotero,
     collections = collections,
     full.update = full.update,
     use.citeproc = use.citeproc,
+    citeproc.host = citeproc.host,
     use.multisession = use.multisession,
     min.multisession = min.multisession,
     n.workers = n.workers,
@@ -865,33 +869,33 @@ CristinMonthly <- \(zotero,
 
   # Finalize monthlies
   if (any(nrow(monthlies)) & any(nrow(extras))) {
-    monthlies <- monthlies |>
-      dplyr::left_join(
-        extras,
-        by = join_by(key, version),
-        suffix = c("", ".remove")) |>
-      dplyr::select(-c(dplyr::ends_with(".remove")))
+    monthlies <- c2z::UpdateInsert(
+      monthlies,
+      extras,
+      check.missing = TRUE
+    )
   }
 
   if (any(nrow(monthlies)) & any(nrow(sdg))) {
     col.lang <- if (lang == "en") "" else paste0("_", lang)
-    monthlies <- monthlies |>
-      dplyr::left_join(
-        sdg |>
-          dplyr::select(
-            key,
-            version,
-            sdg = llm_sdgs_final,
-            research.field = !!sym(paste0("llm_keywords", col.lang)),
-            research.type = !!sym(paste0("llm_research_type", col.lang)),
-            research.design = !!sym(paste0("llm_research_design", col.lang)),
-            theories = !!sym(paste0("llm_theories", col.lang)),
-            synopsis = !!sym(paste0("llm_synopsis", col.lang)),
-            keywords = !!sym(paste0("llm_keywords", col.lang))
-          ),
-        by = join_by(key, version),
-        suffix = c("", ".remove")) |>
-      dplyr::select(-c(dplyr::ends_with(".remove")))
+    sdgs <- sdg |>
+      dplyr::select(
+        key,
+        version,
+        sdg = llm_sdgs_final,
+        research.field = !!sym(paste0("llm_keywords", col.lang)),
+        research.type = !!sym(paste0("llm_research_type", col.lang)),
+        research.design = !!sym(paste0("llm_research_design", col.lang)),
+        theories = !!sym(paste0("llm_theories", col.lang)),
+        synopsis = !!sym(paste0("llm_synopsis", col.lang)),
+        keywords = !!sym(paste0("llm_keywords", col.lang))
+      )
+
+    monthlies <- c2z::UpdateInsert(
+      monthlies,
+      sdgs,
+      check.missing = TRUE
+    )
   }
 
   monthlies <- LocalStorage(

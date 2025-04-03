@@ -29,6 +29,7 @@ CristinMonthly(
   handler = NULL,
   restore.defaults = TRUE,
   use.citeproc = FALSE,
+  citeproc.host = NULL,
   full.update = FALSE,
   lang = "nn",
   post.lang = "nn",
@@ -105,6 +106,8 @@ package. If \code{NULL} and
 
 \item{use.citeproc, }{Use local citeproc and translator to create bibliography,
 Default: FALSE}
+
+\item{citeproc.host}{host for creating citeproc bibliography, Default: NULL}
 
 \item{full.update}{Update bibliography for all items in library,
 Default: FALSE'}

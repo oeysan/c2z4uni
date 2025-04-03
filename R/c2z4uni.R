@@ -148,6 +148,7 @@ Dict <- function(x = NULL,
 #' @keywords internal
 #' @noRd
 ZoteroBib <- \(item,
+               citeproc.host,
                style = "apa-single-spaced",
                locale = "nn-NO",
                bibliography = TRUE,
@@ -156,6 +157,10 @@ ZoteroBib <- \(item,
 
   # Visible bindings
   results <- NULL
+
+  if (is.null(citeproc.host)) {
+    citeproc.host <- "http://localhost"
+  }
 
   bibliography <- if (bibliography) 1 else 0
   citations <- if (citations) 1 else 0
@@ -167,7 +172,7 @@ ZoteroBib <- \(item,
   httr.post <- Online(
     httr::RETRY(
       "POST",
-      "http://localhost:1969/export?format=csljson",
+      paste0(citeproc.host, ":1969/export?format=csljson"),
       body = json.data,
       httr::add_headers("Content-Type" = "application/json"),
       quiet = TRUE
@@ -196,7 +201,7 @@ ZoteroBib <- \(item,
   httr.post <- Online(
     httr::RETRY(
       "POST",
-      "http://localhost:8085",
+      paste0(citeproc.host,":8085"),
       body = json.data,
       query = query.list,
       httr::add_headers("Content-Type" = "application/json"),
@@ -1043,6 +1048,7 @@ CreateMonthlies <- \(zotero,
                      collections,
                      full.update,
                      use.citeproc,
+                     citeproc.host,
                      use.multisession,
                      min.multisession,
                      n.workers,
@@ -1270,6 +1276,7 @@ CreateMonthlies <- \(zotero,
         func = \(data) {
           ZoteroBib(
             item = data,
+            citeproc.host = citeproc.host,
             style = style,
             locale = locale
           )
@@ -2585,6 +2592,36 @@ ZoteroCreator <- \(data = NULL) {
 
   return (creators)
 
+}
+
+#' @title RemoveEmpty
+#' @keywords internal
+#' @noRd
+RemoveNames <- function(x) {
+  if (is.list(x)) {
+    unname(lapply(x, RemoveNames))
+  } else {
+    unname(x)
+  }
+}
+
+#' @title RemoveEmpty
+#' @keywords internal
+#' @noRd
+RemoveEmpty <- \(row) {
+  # Process each element in the list
+  keep <- sapply(row, function(x) {
+    if (is.list(x)) {
+      # Recursively clean the list and then decide whether to keep it
+      cleaned <- RemoveEmpty(x)
+      length(cleaned) > 0  # TRUE if the cleaned list is not empty
+    } else {
+      # Return TRUE if the value is *not* empty
+      !any(is.na(GoFish(x)))
+    }
+  })
+  # Return only the elements that are not empty
+  row[keep]
 }
 
 #' @title ZoteroToJson

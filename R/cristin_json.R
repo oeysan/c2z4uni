@@ -184,16 +184,24 @@ CristinJson <- \(monthlies,
   items <- monthlies.data$results
   log <- c(log, monthlies.data$log)
 
+  # Remove empty elements
+  items <- items |>
+    dplyr::mutate(dplyr::across(dplyr::where(is.list), ~ RemoveNames(.x)))
+  items.list <- split(items, seq(nrow(items)))
+  cleaned.items <- unname(
+    lapply(items.list, \(x) {
+      as.list(unlist(RemoveEmpty(x), recursive = FALSE))
+    }
+    )
+  )
+
   # Create json data
   json <- jsonlite::toJSON(list(
     menu = jsonlite::unbox(menu),
     html = jsonlite::unbox(html),
     collections = collections,
-    items = items
-  ))
-
-  # Remove empty elements
-  json <- gsub(",\"\\w+?\":(\\{\\}|\\[\\])", "", json)
+    items = cleaned.items
+  ), auto_unbox = TRUE)
 
   return (json)
 
